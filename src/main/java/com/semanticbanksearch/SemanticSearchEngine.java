@@ -2,10 +2,10 @@ package com.semanticbanksearch;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
+import java.util.Map;
 
 public class SemanticSearchEngine
 {
@@ -57,8 +57,7 @@ public class SemanticSearchEngine
 
     private List<SemanticSearchResult> semanticResults(List<SemanticRule> matchingRules, StorageIndex index)
     {
-        List<SemanticSearchResult> results = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
+        Map<String, SemanticSearchResult> results = new LinkedHashMap<>();
         for (ObservedItem item : index.items())
         {
             String normalizedItemName = normalize(item.getName());
@@ -66,42 +65,35 @@ public class SemanticSearchEngine
             {
                 if (rule.matchesItem(normalizedItemName))
                 {
-                    addResult(results, seen, item, rule.getCategory(), rule.getReason(), rule.scoreFor(normalizedItemName));
+                    addResult(results, item, rule.getCategory(), rule.getReason(), rule.scoreFor(normalizedItemName));
                 }
             }
         }
-        return results;
+        return new ArrayList<>(results.values());
     }
 
     private List<SemanticSearchResult> fallbackResults(String normalizedQuery, StorageIndex index)
     {
-        List<SemanticSearchResult> results = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
+        Map<String, SemanticSearchResult> results = new LinkedHashMap<>();
         for (ObservedItem item : index.items())
         {
             if (allQueryTokensMatchItem(normalizedQuery, normalize(item.getName())))
             {
-                addResult(results, seen, item, "Item name match", "Item name matches all query terms.", 0);
+                addResult(results, item, "Item name match", "Item name matches all query terms.", 0);
             }
         }
-        return results;
+        return new ArrayList<>(results.values());
     }
 
     private void addResult(
-        List<SemanticSearchResult> results,
-        Set<String> seen,
+        Map<String, SemanticSearchResult> results,
         ObservedItem item,
         String category,
         String reason,
         int score)
     {
-        String key = item.getItemId() + "|" + item.getSourceType() + "|" + item.getSourceName() + "|" + category;
-        if (!seen.add(key))
-        {
-            return;
-        }
-
-        results.add(new SemanticSearchResult(
+        String key = item.getItemId() + "|" + item.getSourceType() + "|" + item.getSourceName();
+        SemanticSearchResult candidate = new SemanticSearchResult(
             item.getItemId(),
             item.getName(),
             item.getQuantity(),
@@ -110,7 +102,12 @@ public class SemanticSearchEngine
             item.isCurrentlyVisible(),
             category,
             reason,
-            score));
+            score);
+        SemanticSearchResult existing = results.get(key);
+        if (existing == null || candidate.getScore() > existing.getScore())
+        {
+            results.put(key, candidate);
+        }
     }
 
     private static boolean allQueryTokensMatchItem(String normalizedQuery, String normalizedItemName)

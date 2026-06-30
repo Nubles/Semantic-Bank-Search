@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Collections;
 import java.util.List;
 import org.junit.Test;
 
@@ -86,10 +87,23 @@ public class SemanticSearchEngineTest
         StorageIndex index = new StorageIndex();
         index.record(50, "Barrows teleport", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
 
-        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("barrows tele", index);
+        List<SemanticSearchResult> results = new SemanticSearchEngine(Collections.emptyList()).search("barrows tele", index);
 
         assertEquals(1, results.size());
         assertEquals("Barrows teleport", results.get(0).getItemName());
+        assertEquals("Item name match", results.get(0).getCategory());
+    }
+
+    @Test
+    public void itemMatchingMultipleSemanticRulesAppearsOnce()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(60, "Clue hunter garb", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("clue utility warm clothing", index);
+
+        assertEquals(1, results.size());
+        assertEquals("Clue hunter garb", results.get(0).getItemName());
     }
 
     private static String names(List<SemanticSearchResult> results)

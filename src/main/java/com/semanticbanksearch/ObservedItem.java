@@ -17,6 +17,18 @@ public class ObservedItem
         this(0, "", 0, StorageSourceType.OTHER_STORAGE, "", false, 0L);
     }
 
+    ObservedItem(ObservedItem source)
+    {
+        this(
+            source == null ? 0 : source.itemId,
+            source == null ? "" : source.name,
+            source == null ? 0 : source.quantity,
+            source == null ? StorageSourceType.OTHER_STORAGE : source.sourceType,
+            source == null ? "" : source.sourceName,
+            source != null && source.currentlyVisible,
+            source == null ? 0L : source.lastSeenMillis);
+    }
+
     ObservedItem(
         int itemId,
         String name,

@@ -50,6 +50,30 @@ public class StorageIndexTest
     }
 
     @Test
+    public void returnedItemsCannotMutateIndexState()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(100, "Prayer potion(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        index.items().get(0).setCurrentlyVisible(false);
+
+        assertTrue(index.items().get(0).isCurrentlyVisible());
+    }
+
+    @Test
+    public void retainedReturnedItemsDoNotChangeWhenIndexChanges()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(100, "Prayer potion(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        ObservedItem retainedItem = index.items().get(0);
+
+        index.markSourceNotVisible(StorageSourceType.BANK, "Bank");
+
+        assertTrue(retainedItem.isCurrentlyVisible());
+        assertFalse(index.items().get(0).isCurrentlyVisible());
+    }
+
+    @Test
     public void trimsOldEntriesByMaximumCount()
     {
         StorageIndex index = new StorageIndex();

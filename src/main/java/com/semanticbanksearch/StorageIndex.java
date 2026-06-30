@@ -12,7 +12,12 @@ public class StorageIndex
     public List<ObservedItem> items()
     {
         items.sort(Comparator.comparingLong(ObservedItem::getLastSeenMillis));
-        return new ArrayList<>(items);
+        List<ObservedItem> snapshots = new ArrayList<>();
+        for (ObservedItem item : items)
+        {
+            snapshots.add(new ObservedItem(item));
+        }
+        return snapshots;
     }
 
     public void record(

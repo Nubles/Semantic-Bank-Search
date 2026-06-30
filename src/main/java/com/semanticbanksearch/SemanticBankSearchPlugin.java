@@ -92,9 +92,13 @@ public class SemanticBankSearchPlugin extends Plugin
 		clientToolbar.addNavigation(navigationButton);
 
 		bankOpen = isBankOpen();
-		if (bankOpen)
+		if (bankOpen && config.rememberObservedStorage())
 		{
 			observeBank(System.currentTimeMillis());
+		}
+		else
+		{
+			index.markSourceNotVisible(StorageSourceType.BANK, BANK_SOURCE_NAME);
 		}
 		clearSearch();
 	}
@@ -102,6 +106,10 @@ public class SemanticBankSearchPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
+		if (index != null)
+		{
+			index.markSourceNotVisible(StorageSourceType.BANK, BANK_SOURCE_NAME);
+		}
 		persist();
 		if (overlay != null)
 		{
@@ -204,40 +212,35 @@ public class SemanticBankSearchPlugin extends Plugin
 			return;
 		}
 
+		List<ObservedItem> visibleItems = new ArrayList<>();
 		ItemContainer itemContainer = client.getItemContainer(InventoryID.BANK);
-		if (itemContainer == null)
+		Item[] items = itemContainer == null ? null : itemContainer.getItems();
+		if (items != null)
 		{
-			return;
-		}
-
-		Item[] items = itemContainer.getItems();
-		if (items == null)
-		{
-			return;
-		}
-
-		for (Item item : items)
-		{
-			if (item == null || item.getId() <= 0 || item.getQuantity() <= 0)
+			for (Item item : items)
 			{
-				continue;
-			}
+				if (item == null || item.getId() <= 0 || item.getQuantity() <= 0)
+				{
+					continue;
+				}
 
-			int canonicalId = itemManager.canonicalize(item.getId());
-			String name = resolveItemName(canonicalId);
-			if (canonicalId > 0 && !name.isEmpty())
-			{
-				index.record(
-					canonicalId,
-					name,
-					item.getQuantity(),
-					StorageSourceType.BANK,
-					BANK_SOURCE_NAME,
-					true,
-					now);
+				int canonicalId = itemManager.canonicalize(item.getId());
+				String name = resolveItemName(canonicalId);
+				if (canonicalId > 0 && !name.isEmpty())
+				{
+					visibleItems.add(new ObservedItem(
+						canonicalId,
+						name,
+						item.getQuantity(),
+						StorageSourceType.BANK,
+						BANK_SOURCE_NAME,
+						true,
+						now));
+				}
 			}
 		}
 
+		index.replaceVisibleSourceItems(StorageSourceType.BANK, BANK_SOURCE_NAME, visibleItems);
 		index.trimToMaximumEntries(config.maximumRememberedEntries());
 	}
 

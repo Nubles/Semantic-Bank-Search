@@ -55,6 +55,35 @@ public class StorageIndex
         items.add(observed);
     }
 
+    public void replaceVisibleSourceItems(
+        StorageSourceType sourceType,
+        String sourceName,
+        List<ObservedItem> visibleItems)
+    {
+        markSourceNotVisible(sourceType, sourceName);
+        if (visibleItems == null)
+        {
+            return;
+        }
+
+        for (ObservedItem item : visibleItems)
+        {
+            if (item == null)
+            {
+                continue;
+            }
+
+            record(
+                item.getItemId(),
+                item.getName(),
+                item.getQuantity(),
+                sourceType,
+                sourceName,
+                true,
+                item.getLastSeenMillis());
+        }
+    }
+
     public void markSourceNotVisible(StorageSourceType sourceType, String sourceName)
     {
         StorageSourceType normalizedSourceType = ObservedItem.normalizeSourceType(sourceType);

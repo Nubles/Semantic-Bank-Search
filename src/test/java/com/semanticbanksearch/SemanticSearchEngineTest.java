@@ -25,6 +25,19 @@ public class SemanticSearchEngineTest
     }
 
     @Test
+    public void bankResultsAreNotHighlightableAfterSourceVisibilityIsCleared()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(1, "Prayer potion(4)", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.markSourceNotVisible(StorageSourceType.BANK, "Bank");
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("prayer restoration", index);
+
+        assertEquals(1, results.size());
+        assertFalse(results.get(0).isHighlightable());
+    }
+
+    @Test
     public void warmClothingFindsOwnedWarmItems()
     {
         StorageIndex index = new StorageIndex();

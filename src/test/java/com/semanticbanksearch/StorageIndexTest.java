@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Arrays;
 import java.util.List;
 import org.junit.Test;
 
@@ -50,6 +51,22 @@ public class StorageIndexTest
     }
 
     @Test
+    public void replacingVisibleSourceItemsClearsMissingItems()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(100, "Prayer potion(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(200, "Super restore(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        index.replaceVisibleSourceItems(
+            StorageSourceType.BANK,
+            "Bank",
+            Arrays.asList(new ObservedItem(100, "Prayer potion(4)", 2, StorageSourceType.BANK, "Bank", true, 2_000L)));
+
+        assertTrue(itemById(index.items(), 100).isCurrentlyVisible());
+        assertFalse(itemById(index.items(), 200).isCurrentlyVisible());
+    }
+
+    @Test
     public void returnedItemsCannotMutateIndexState()
     {
         StorageIndex index = new StorageIndex();
@@ -86,5 +103,17 @@ public class StorageIndexTest
         assertEquals(2, index.items().size());
         assertEquals(101, index.items().get(0).getItemId());
         assertEquals(102, index.items().get(1).getItemId());
+    }
+
+    private static ObservedItem itemById(List<ObservedItem> items, int itemId)
+    {
+        for (ObservedItem item : items)
+        {
+            if (item.getItemId() == itemId)
+            {
+                return item;
+            }
+        }
+        throw new AssertionError("Missing item " + itemId);
     }
 }

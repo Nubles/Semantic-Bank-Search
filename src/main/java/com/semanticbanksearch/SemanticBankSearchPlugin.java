@@ -218,7 +218,7 @@ public class SemanticBankSearchPlugin extends Plugin
 
 		for (Item item : items)
 		{
-			if (item == null || item.getId() <= 0)
+			if (item == null || item.getId() <= 0 || item.getQuantity() <= 0)
 			{
 				continue;
 			}

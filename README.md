@@ -13,4 +13,6 @@ Example searches:
 - things that cut webs
 - fastest food I own
 
-The plugin is local-only. It reads visible bank items, remembers observed storage locally, and highlights matching visible bank items. It does not click, withdraw, deposit, move, tag, modify menus, use external services, or send bank contents anywhere.
+The plugin is local-only. It reads visible bank items, remembers observed storage locally, and highlights matching visible bank items. Remembered storage only includes items the client has observed; it cannot infer items from tabs, accounts, or storage containers that have not been opened in RuneLite.
+
+It does not click, withdraw, deposit, move, tag, modify menus, use external services, or send bank contents anywhere.

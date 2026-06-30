@@ -26,6 +26,7 @@ sourceSets {
 
 dependencies {
     compileOnly group: 'net.runelite', name: 'client', version: runeLiteVersion
+    implementation 'com.google.code.gson:gson:2.10.1'
     devImplementation group: 'net.runelite', name: 'client', version: runeLiteVersion
     devImplementation group: 'net.runelite', name: 'jshell', version: runeLiteVersion
     testImplementation 'junit:junit:4.13.2'

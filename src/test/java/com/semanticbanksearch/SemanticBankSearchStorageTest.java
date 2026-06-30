@@ -1,6 +1,7 @@
 package com.semanticbanksearch;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import com.google.gson.Gson;
@@ -29,5 +30,22 @@ public class SemanticBankSearchStorageTest
         assertEquals(2, loaded.items().get(0).getQuantity());
         assertEquals(StorageSourceType.BANK, loaded.items().get(0).getSourceType());
         assertTrue(loaded.items().get(0).isCurrentlyVisible());
+    }
+
+    @Test
+    public void malformedItemFieldsDeserializeIntoUsableStorageIndex()
+    {
+        String json = "{\"items\":[{\"itemId\":100,\"name\":\" Prayer potion(4) \",\"quantity\":2,"
+            + "\"sourceType\":\"BANK\",\"sourceName\":null,\"currentlyVisible\":true,\"lastSeenMillis\":1000}]}";
+
+        StorageIndex loaded = SemanticBankSearchStorage.deserialize(new Gson(), json);
+
+        assertEquals("Prayer potion(4)", loaded.items().get(0).getName());
+        assertEquals("", loaded.items().get(0).getSourceName());
+        assertEquals(StorageSourceType.BANK, loaded.items().get(0).getSourceType());
+
+        loaded.markSourceNotVisible(StorageSourceType.BANK, "");
+
+        assertFalse(loaded.items().get(0).isCurrentlyVisible());
     }
 }

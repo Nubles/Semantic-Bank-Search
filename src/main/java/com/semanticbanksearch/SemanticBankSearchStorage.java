@@ -28,14 +28,25 @@ class SemanticBankSearchStorage
 
         try
         {
-            StorageIndex index = gson.fromJson(json, StorageIndex.class);
-            if (index == null)
+            StorageIndex temporary = gson.fromJson(json, StorageIndex.class);
+            if (temporary == null)
             {
                 return new StorageIndex();
             }
 
-            index.items();
-            return index;
+            StorageIndex sanitized = new StorageIndex();
+            for (ObservedItem item : temporary.items())
+            {
+                sanitized.record(
+                    item.getItemId(),
+                    item.getName(),
+                    item.getQuantity(),
+                    item.getSourceType(),
+                    item.getSourceName(),
+                    item.isCurrentlyVisible(),
+                    item.getLastSeenMillis());
+            }
+            return sanitized;
         }
         catch (JsonSyntaxException ex)
         {

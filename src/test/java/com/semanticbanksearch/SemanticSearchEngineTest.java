@@ -119,6 +119,117 @@ public class SemanticSearchEngineTest
         assertEquals("Clue hunter garb", results.get(0).getItemName());
     }
 
+    @Test
+    public void teleportJewelleryFindsOwnedTeleportJewellery()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(100, "Games necklace(8)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(101, "Hammer", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("teleport jewellery", index);
+
+        assertEquals(1, results.size());
+        assertEquals("Games necklace(8)", results.get(0).getItemName());
+    }
+
+    @Test
+    public void staminaFindsRunEnergyPotion()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(110, "Stamina potion(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("stamina", index);
+
+        assertEquals(1, results.size());
+        assertEquals("Stamina potion(4)", results.get(0).getItemName());
+    }
+
+    @Test
+    public void antifireFindsDragonProtectionPotion()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(120, "Extended antifire(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("antifire", index);
+
+        assertEquals(1, results.size());
+        assertEquals("Extended antifire(4)", results.get(0).getItemName());
+    }
+
+    @Test
+    public void rangedAmmoFindsArrowsAndBolts()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(130, "Rune arrow", 100, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(131, "Diamond bolts (e)", 50, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(132, "Air rune", 500, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("ranged ammo", index);
+
+        assertEquals(2, results.size());
+        assertTrue(names(results).contains("Rune arrow"));
+        assertTrue(names(results).contains("Diamond bolts (e)"));
+        assertFalse(names(results).contains("Air rune"));
+    }
+
+    @Test
+    public void magicRunesFindsOwnedRunes()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(140, "Law rune", 500, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(141, "Nature rune", 500, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(142, "Rune platebody", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("magic runes", index);
+
+        assertEquals(2, results.size());
+        assertTrue(names(results).contains("Law rune"));
+        assertTrue(names(results).contains("Nature rune"));
+        assertFalse(names(results).contains("Rune platebody"));
+    }
+
+    @Test
+    public void farmingToolsFindsOwnedFarmingTools()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(150, "Seed dibber", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(151, "Magic secateurs", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("farming tools", index);
+
+        assertEquals(2, results.size());
+        assertTrue(names(results).contains("Seed dibber"));
+        assertTrue(names(results).contains("Magic secateurs"));
+    }
+
+    @Test
+    public void fishingToolsFindsOwnedFishingTools()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(160, "Harpoon", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(161, "Lobster pot", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("fishing tools", index);
+
+        assertEquals(2, results.size());
+        assertTrue(names(results).contains("Harpoon"));
+        assertTrue(names(results).contains("Lobster pot"));
+    }
+
+    @Test
+    public void clueToolsFindsLightSourceAndSpade()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(170, "Bullseye lantern", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(171, "Spade", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("clue tools", index);
+
+        assertEquals(2, results.size());
+        assertTrue(names(results).contains("Bullseye lantern"));
+        assertTrue(names(results).contains("Spade"));
+    }
+
     private static String names(List<SemanticSearchResult> results)
     {
         StringBuilder builder = new StringBuilder();

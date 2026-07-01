@@ -6,9 +6,20 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 public class SemanticRule
 {
+    private static final Set<String> GENERIC_CATEGORY_WORDS = Set.of(
+        "weapon",
+        "weapons",
+        "tool",
+        "tools",
+        "utility",
+        "supplies",
+        "protection",
+        "restoration");
+
     private final String category;
     private final String reason;
     private final List<String> queryAliases;
@@ -105,7 +116,7 @@ public class SemanticRule
         List<String> words = new ArrayList<>();
         for (String word : normalizedCategory.split("\\s+"))
         {
-            if (word.length() > 2)
+            if (word.length() > 2 && !GENERIC_CATEGORY_WORDS.contains(word))
             {
                 words.add(word);
             }

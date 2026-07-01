@@ -16,6 +16,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 
@@ -32,15 +33,18 @@ public class SemanticBankSearchPanel extends PluginPanel
 	};
 
 	private final Consumer<String> searchConsumer;
+	private final Runnable allIndexedConsumer;
 	private final Runnable clearConsumer;
 	private final JPanel resultsContainer = new JPanel();
 	private final JLabel statusLabel = new JLabel(" ");
 	private final JTextField searchField = new JTextField();
+	private int renderSequence;
 
-	public SemanticBankSearchPanel(Consumer<String> searchConsumer, Runnable clearConsumer)
+	public SemanticBankSearchPanel(Consumer<String> searchConsumer, Runnable allIndexedConsumer, Runnable clearConsumer)
 	{
 		super();
 		this.searchConsumer = searchConsumer == null ? ignored -> { } : searchConsumer;
+		this.allIndexedConsumer = allIndexedConsumer == null ? () -> { } : allIndexedConsumer;
 		this.clearConsumer = clearConsumer == null ? () -> { } : clearConsumer;
 
 		setLayout(new BorderLayout(0, 8));
@@ -60,12 +64,55 @@ public class SemanticBankSearchPanel extends PluginPanel
 
 	public void updateResults(String query, List<SemanticSearchResult> results, String status)
 	{
+		int sequence = nextRenderSequence();
 		List<SemanticSearchResult> safeResults = results == null ? Collections.emptyList() : new ArrayList<>(results);
-		resultsContainer.removeAll();
-		searchField.setText(query == null ? "" : query);
-		statusLabel.setText(status == null || status.trim().isEmpty() ? " " : status.trim());
+		String safeStatus = status == null ? "" : status;
+		if (!SwingUtilities.isEventDispatchThread())
+		{
+			SwingUtilities.invokeLater(() -> renderResults(sequence, safeResults, safeStatus));
+			return;
+		}
 
-		if (safeResults.isEmpty())
+		renderResults(sequence, safeResults, safeStatus);
+	}
+
+	public void updateIndexedItems(List<ObservedItem> items, String status)
+	{
+		int sequence = nextRenderSequence();
+		List<ObservedItem> safeItems = copyObservedItems(items);
+		String safeStatus = status == null ? "" : status;
+		if (!SwingUtilities.isEventDispatchThread())
+		{
+			SwingUtilities.invokeLater(() -> renderIndexedItems(sequence, safeItems, safeStatus));
+			return;
+		}
+
+		renderIndexedItems(sequence, safeItems, safeStatus);
+	}
+
+	public void clearResults()
+	{
+		int sequence = nextRenderSequence();
+		if (!SwingUtilities.isEventDispatchThread())
+		{
+			SwingUtilities.invokeLater(() -> renderClearResults(sequence));
+			return;
+		}
+
+		renderClearResults(sequence);
+	}
+
+	private void renderResults(int sequence, List<SemanticSearchResult> results, String status)
+	{
+		if (!isLatestRenderSequence(sequence))
+		{
+			return;
+		}
+
+		resultsContainer.removeAll();
+		statusLabel.setText(status.trim().isEmpty() ? " " : status.trim());
+
+		if (results.isEmpty())
 		{
 			resultsContainer.add(textBlock(
 				"No matching items",
@@ -73,7 +120,7 @@ public class SemanticBankSearchPanel extends PluginPanel
 		}
 		else
 		{
-			for (SemanticSearchResult result : safeResults)
+			for (SemanticSearchResult result : results)
 			{
 				resultsContainer.add(resultCard(result));
 			}
@@ -83,8 +130,41 @@ public class SemanticBankSearchPanel extends PluginPanel
 		repaint();
 	}
 
-	public void clearResults()
+	private void renderIndexedItems(int sequence, List<ObservedItem> items, String status)
 	{
+		if (!isLatestRenderSequence(sequence))
+		{
+			return;
+		}
+
+		resultsContainer.removeAll();
+		statusLabel.setText(status.trim().isEmpty() ? "" : status.trim());
+
+		if (items.isEmpty())
+		{
+			resultsContainer.add(textBlock(
+				"No indexed items yet",
+				"Open your bank so Semantic Bank Search can observe and index visible bank items."));
+		}
+		else
+		{
+			for (ObservedItem item : items)
+			{
+				resultsContainer.add(indexedItemCard(item));
+			}
+		}
+
+		revalidate();
+		repaint();
+	}
+
+	private void renderClearResults(int sequence)
+	{
+		if (!isLatestRenderSequence(sequence))
+		{
+			return;
+		}
+
 		resultsContainer.removeAll();
 		statusLabel.setText(" ");
 		resultsContainer.add(textBlock(
@@ -92,6 +172,16 @@ public class SemanticBankSearchPanel extends PluginPanel
 			"Type what you need, like poison protection or warm clothing, then press Enter."));
 		revalidate();
 		repaint();
+	}
+
+	private synchronized int nextRenderSequence()
+	{
+		return ++renderSequence;
+	}
+
+	private synchronized boolean isLatestRenderSequence(int sequence)
+	{
+		return sequence == renderSequence;
 	}
 
 	private JPanel searchControls()
@@ -105,9 +195,22 @@ public class SemanticBankSearchPanel extends PluginPanel
 		title.setFont(title.getFont().deriveFont(Font.BOLD, 16f));
 		panel.add(title, BorderLayout.NORTH);
 
-		JPanel controls = new JPanel(new BorderLayout(4, 4));
+		JPanel controls = new JPanel(new BorderLayout(0, 4));
 		controls.setOpaque(false);
-		controls.add(searchField, BorderLayout.CENTER);
+		controls.add(searchField, BorderLayout.NORTH);
+
+		JPanel buttons = new JPanel(new GridLayout(1, 0, 4, 0));
+		buttons.setOpaque(false);
+
+		JButton searchButton = new JButton("Search");
+		searchButton.setFocusable(false);
+		searchButton.addActionListener(event -> runSearch(searchField.getText()));
+		buttons.add(searchButton);
+
+		JButton allIndexedButton = new JButton("All Indexed");
+		allIndexedButton.setFocusable(false);
+		allIndexedButton.addActionListener(event -> allIndexedConsumer.run());
+		buttons.add(allIndexedButton);
 
 		JButton clearButton = new JButton("Clear");
 		clearButton.setFocusable(false);
@@ -116,7 +219,9 @@ public class SemanticBankSearchPanel extends PluginPanel
 			clearConsumer.run();
 			clearResults();
 		});
-		controls.add(clearButton, BorderLayout.EAST);
+		buttons.add(clearButton);
+
+		controls.add(buttons, BorderLayout.SOUTH);
 		panel.add(controls, BorderLayout.CENTER);
 
 		JPanel examples = new JPanel(new GridLayout(0, 1, 0, 4));
@@ -134,6 +239,24 @@ public class SemanticBankSearchPanel extends PluginPanel
 		panel.add(examples, BorderLayout.SOUTH);
 
 		return panel;
+	}
+
+	private static List<ObservedItem> copyObservedItems(List<ObservedItem> items)
+	{
+		List<ObservedItem> safeItems = new ArrayList<>();
+		if (items == null)
+		{
+			return safeItems;
+		}
+
+		for (ObservedItem item : items)
+		{
+			if (item != null)
+			{
+				safeItems.add(item);
+			}
+		}
+		return safeItems;
 	}
 
 	private void runSearch(String query)
@@ -160,6 +283,27 @@ public class SemanticBankSearchPanel extends PluginPanel
 		body.add(detailLabel(result.getCategory()));
 		body.add(wrappedText(result.getReason()));
 		body.add(detailLabel(details(result)));
+		panel.add(body, BorderLayout.CENTER);
+		return panel;
+	}
+
+	private static JPanel indexedItemCard(ObservedItem item)
+	{
+		JPanel panel = new JPanel(new BorderLayout(0, 6));
+		panel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		panel.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createMatteBorder(0, 0, 1, 0, ColorScheme.DARK_GRAY_COLOR),
+			BorderFactory.createEmptyBorder(8, 8, 8, 8)));
+
+		JLabel title = new JLabel(item.getName());
+		title.setForeground(Color.WHITE);
+		title.setFont(title.getFont().deriveFont(Font.BOLD));
+		panel.add(title, BorderLayout.NORTH);
+
+		JPanel body = new JPanel();
+		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+		body.setOpaque(false);
+		body.add(detailLabel(indexedDetails(item)));
 		panel.add(body, BorderLayout.CENTER);
 		return panel;
 	}
@@ -206,6 +350,19 @@ public class SemanticBankSearchPanel extends PluginPanel
 		String highlightState = result.isHighlightable() ? "highlightable" : "not highlightable";
 		return "Source " + source
 			+ " | Quantity " + result.getQuantity()
+			+ " | " + highlightState;
+	}
+
+	private static String indexedDetails(ObservedItem item)
+	{
+		String source = item.getSourceName().isEmpty()
+			? item.getSourceType().name()
+			: item.getSourceName();
+		String highlightState = item.isCurrentlyVisible() && item.getSourceType() == StorageSourceType.BANK
+			? "visible in bank"
+			: "remembered";
+		return "Source " + source
+			+ " | Quantity " + item.getQuantity()
 			+ " | " + highlightState;
 	}
 }

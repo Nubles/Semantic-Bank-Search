@@ -151,6 +151,10 @@ public class SemanticSearchEngine
             {
                 builder.append(current);
             }
+            else if (current == '+')
+            {
+                builder.append(" plus ");
+            }
             else if (current == '\'' && isInnerWordApostrophe(lower, i))
             {
                 builder.append(current);

@@ -18,6 +18,7 @@ public class SemanticRule
         "utility",
         "supplies",
         "protection",
+        "prep",
         "restoration");
 
     private final String category;

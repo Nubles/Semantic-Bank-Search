@@ -230,6 +230,142 @@ public class SemanticSearchEngineTest
         assertTrue(names(results).contains("Spade"));
     }
 
+    @Test
+    public void vorkathPrepFindsDragonfireAndRangedSupplies()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(200, "Extended super antifire(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(201, "Dragon crossbow", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(202, "Diamond dragon bolts (e)", 50, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(203, "Lobster pot", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("vorkath gear", index);
+
+        assertEquals(3, results.size());
+        assertTrue(names(results).contains("Extended super antifire(4)"));
+        assertTrue(names(results).contains("Dragon crossbow"));
+        assertTrue(names(results).contains("Diamond dragon bolts (e)"));
+        assertFalse(names(results).contains("Lobster pot"));
+    }
+
+    @Test
+    public void fightCavesPrepFindsPrayerRangedAndSustains()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(210, "Prayer potion(4)", 4, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(211, "Toxic blowpipe", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(212, "Saradomin brew(4)", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(213, "Hammer", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("fight caves supplies", index);
+
+        assertEquals(3, results.size());
+        assertTrue(names(results).contains("Prayer potion(4)"));
+        assertTrue(names(results).contains("Toxic blowpipe"));
+        assertTrue(names(results).contains("Saradomin brew(4)"));
+        assertFalse(names(results).contains("Hammer"));
+    }
+
+    @Test
+    public void zulrahPrepFindsAntipoisonAndSwitchGear()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(220, "Anti-venom+(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(221, "Trident of the swamp", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(222, "Magic shortbow", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(223, "Spade", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("zulrah setup", index);
+
+        assertEquals(3, results.size());
+        assertTrue(names(results).contains("Anti-venom+(4)"));
+        assertTrue(names(results).contains("Trident of the swamp"));
+        assertTrue(names(results).contains("Magic shortbow"));
+        assertFalse(names(results).contains("Spade"));
+    }
+
+    @Test
+    public void bossPrepKeywordDoesNotMatchEveryBossPrepRule()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(230, "Extended super antifire(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(231, "Dragon crossbow", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(232, "Spade", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(233, "Rune thrownaxe", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("vorkath prep", index);
+
+        assertEquals(2, results.size());
+        assertTrue(names(results).contains("Extended super antifire(4)"));
+        assertTrue(names(results).contains("Dragon crossbow"));
+        assertFalse(names(results).contains("Spade"));
+        assertFalse(names(results).contains("Rune thrownaxe"));
+    }
+
+    @Test
+    public void barrowsTeleportQueryPrefersTeleportRuleOverBossPrep()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(240, "Barrows teleport", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(241, "Spade", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(242, "Prayer potion(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("barrows teleport", index);
+
+        assertEquals(1, results.size());
+        assertEquals("Barrows teleport", results.get(0).getItemName());
+        assertEquals("Barrows teleports", results.get(0).getCategory());
+    }
+
+    @Test
+    public void bareBarrowsQueryFindsTravelItemsWithoutBossPrepBleed()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(250, "Mort'ton teleport", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(251, "Morytania legs 3", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(252, "Drakan's medallion", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(253, "Spade", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("barrows", index);
+
+        assertEquals(3, results.size());
+        assertTrue(names(results).contains("Mort'ton teleport"));
+        assertTrue(names(results).contains("Morytania legs 3"));
+        assertTrue(names(results).contains("Drakan's medallion"));
+        assertFalse(names(results).contains("Spade"));
+    }
+
+    @Test
+    public void zulrahPrepRanksAntiVenomPlusAbovePlainAntiVenom()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(260, "Anti-venom(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(261, "Anti-venom+(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("zulrah setup", index);
+
+        assertEquals(2, results.size());
+        assertEquals("Anti-venom+(4)", results.get(0).getItemName());
+        assertEquals("Anti-venom(4)", results.get(1).getItemName());
+    }
+
+    @Test
+    public void runEnergyQueryDoesNotReturnCryptPrepItems()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(270, "Stamina potion(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(271, "Barrows teleport", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(272, "Spade", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("run energy", index);
+
+        assertEquals(1, results.size());
+        assertEquals("Stamina potion(4)", results.get(0).getItemName());
+        assertEquals("Run energy restoration", results.get(0).getCategory());
+        assertFalse(names(results).contains("Barrows teleport"));
+        assertFalse(names(results).contains("Spade"));
+    }
+
     private static String names(List<SemanticSearchResult> results)
     {
         StringBuilder builder = new StringBuilder();

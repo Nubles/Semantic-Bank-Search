@@ -1,6 +1,7 @@
 package com.semanticbanksearch;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import net.runelite.api.InventoryID;
 import net.runelite.api.widgets.ComponentID;
@@ -57,7 +58,7 @@ final class ObservedStorageSource
 
     static List<ObservedStorageSource> safeDirectInventorySources()
     {
-        return Arrays.asList(BANK, SEED_VAULT, GROUP_STORAGE);
+        return Collections.unmodifiableList(Arrays.asList(BANK, SEED_VAULT, GROUP_STORAGE));
     }
 
     InventoryID getInventoryId()

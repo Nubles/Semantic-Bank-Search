@@ -50,6 +50,14 @@ public class ObservedStorageSourceTest
         assertFalse(containsInventory(sources, InventoryID.WILDERNESS_LOOT_CHEST));
     }
 
+    @Test(expected = UnsupportedOperationException.class)
+    public void safeDirectSourcesListCannotBeMutated()
+    {
+        List<ObservedStorageSource> sources = ObservedStorageSource.safeDirectInventorySources();
+
+        sources.set(0, ObservedStorageSource.groupStorage());
+    }
+
     private static void assertSource(
         ObservedStorageSource source,
         InventoryID inventoryId,

@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 import javax.inject.Inject;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
@@ -90,6 +91,7 @@ public class SemanticBankSearchPlugin extends Plugin
 	private long viewRevision;
 	private volatile boolean bankOpen;
 	private long lastPersistMillis;
+	private Consumer<StorageIndex> observedStoragePersistence = this::persistToConfig;
 
 	@Provides
 	SemanticBankSearchConfig provideConfig(ConfigManager configManager)
@@ -121,15 +123,7 @@ public class SemanticBankSearchPlugin extends Plugin
 		clientToolbar.addNavigation(navigationButton);
 
 		bankOpen = isBankOpen();
-		if (config.rememberObservedStorage())
-		{
-			markAllStorageSourcesNotVisible();
-			observeSafeStorage(System.currentTimeMillis());
-		}
-		else
-		{
-			markAllStorageSourcesNotVisible();
-		}
+		startObservedStorageLifecycle(System.currentTimeMillis());
 		clearSearch();
 	}
 
@@ -168,28 +162,8 @@ public class SemanticBankSearchPlugin extends Plugin
 		}
 
 		long now = System.currentTimeMillis();
-		boolean currentlyBankOpen = isBankOpen();
-		bankOpen = currentlyBankOpen;
-		if (config.rememberObservedStorage())
-		{
-			Set<String> previouslyVisibleSourceKeys = new HashSet<>(visibleStorageSourceKeys);
-			boolean changed = observeSafeStorage(now);
-			boolean visibilityLost = !visibleStorageSourceKeys.containsAll(previouslyVisibleSourceKeys);
-			if (lastPersistMillis == 0L || now - lastPersistMillis >= SAVE_INTERVAL_MILLIS || visibilityLost)
-			{
-				persist();
-			}
-			if (changed)
-			{
-				refreshActivePanelMode();
-			}
-		}
-		else if (!visibleStorageSourceKeys.isEmpty())
-		{
-			markAllStorageSourcesNotVisible();
-			refreshActivePanelMode();
-			persist();
-		}
+		bankOpen = isBankOpen();
+		handleObservedStorageTick(now);
 	}
 
 	private void runSearch(String query)
@@ -329,6 +303,74 @@ public class SemanticBankSearchPlugin extends Plugin
 		}
 	}
 
+	void startObservedStorageLifecycle(long now)
+	{
+		markAllStorageSourcesNotVisible();
+		if (config != null && config.rememberObservedStorage())
+		{
+			observeSafeStorage(now);
+		}
+	}
+
+	boolean handleObservedStorageTick(long now)
+	{
+		if (index == null || config == null)
+		{
+			return false;
+		}
+
+		if (config.rememberObservedStorage())
+		{
+			Set<String> previouslyVisibleSourceKeys = new HashSet<>(visibleStorageSourceKeys);
+			boolean changed = observeSafeStorage(now);
+			boolean visibilityLost = !visibleStorageSourceKeys.containsAll(previouslyVisibleSourceKeys);
+			boolean shouldPersist = lastPersistMillis == 0L || now - lastPersistMillis >= SAVE_INTERVAL_MILLIS || visibilityLost;
+			if (shouldPersist)
+			{
+				persist(now);
+			}
+			if (changed)
+			{
+				refreshActivePanelMode();
+			}
+			return shouldPersist;
+		}
+
+		if (!visibleStorageSourceKeys.isEmpty())
+		{
+			markAllStorageSourcesNotVisible();
+			refreshActivePanelMode();
+			persist(now);
+			return true;
+		}
+		return false;
+	}
+
+	void setObservedStorageLifecycleStateForTesting(
+		StorageIndex index,
+		ObservedStorageScanner storageScanner,
+		SemanticBankSearchConfig config)
+	{
+		this.index = index;
+		this.storageScanner = storageScanner;
+		this.config = config;
+	}
+
+	void setObservedStoragePersistenceForTesting(Consumer<StorageIndex> observedStoragePersistence)
+	{
+		this.observedStoragePersistence = observedStoragePersistence;
+	}
+
+	void rememberVisibleStorageSourceForTesting(ObservedStorageSource source)
+	{
+		visibleStorageSourceKeys.add(source.key());
+	}
+
+	void setLastPersistMillisForTesting(long lastPersistMillis)
+	{
+		this.lastPersistMillis = lastPersistMillis;
+	}
+
 	private boolean observeSafeStorage(long now)
 	{
 		if (index == null || storageScanner == null || !config.rememberObservedStorage())
@@ -418,16 +460,26 @@ public class SemanticBankSearchPlugin extends Plugin
 
 	private void persist()
 	{
+		persist(System.currentTimeMillis());
+	}
+
+	private void persist(long persistedAtMillis)
+	{
 		if (index == null)
 		{
 			return;
 		}
 
+		observedStoragePersistence.accept(index);
+		lastPersistMillis = persistedAtMillis;
+	}
+
+	private void persistToConfig(StorageIndex persistedIndex)
+	{
 		configManager.setConfiguration(
 			SemanticBankSearchConfig.GROUP,
 			STORAGE_KEY,
-			SemanticBankSearchStorage.serialize(gson, index));
-		lastPersistMillis = System.currentTimeMillis();
+			SemanticBankSearchStorage.serialize(gson, persistedIndex));
 	}
 
 	private String indexedStatus(List<ObservedItem> items)

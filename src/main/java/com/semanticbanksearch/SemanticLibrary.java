@@ -24,6 +24,7 @@ public final class SemanticLibrary
         rules.addAll(ProtectionRules.create());
         rules.addAll(ToolRules.create());
         rules.addAll(SkillingRules.create());
+        rules.addAll(MinigameRules.create());
         rules.addAll(ClueRules.create());
         return rules;
     }

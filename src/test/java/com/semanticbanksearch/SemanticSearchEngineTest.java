@@ -688,6 +688,116 @@ public class SemanticSearchEngineTest
         assertFalse(names(results).contains("Rune platebody"));
     }
 
+    @Test
+    public void wintertodtSuppliesFindsWarmClothingAndTools()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(650, "Clue hunter garb", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(651, "Steel axe", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(652, "Tinderbox", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(653, "Hammer", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(654, "Rune platebody", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(655, "Rune pickaxe", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(656, "Rune battleaxe", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("wintertodt supplies", index);
+
+        assertEquals(4, results.size());
+        assertTrue(names(results).contains("Clue hunter garb"));
+        assertTrue(names(results).contains("Steel axe"));
+        assertTrue(names(results).contains("Tinderbox"));
+        assertTrue(names(results).contains("Hammer"));
+        assertFalse(names(results).contains("Rune platebody"));
+        assertFalse(names(results).contains("Rune pickaxe"));
+        assertFalse(names(results).contains("Rune battleaxe"));
+    }
+
+    @Test
+    public void temporossSuppliesFindsFishingTools()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(660, "Dragon harpoon", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(661, "Rope", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(662, "Bucket", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(663, "Angler hat", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(664, "Rune scimitar", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(665, "Granite hammer", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("tempoross supplies", index);
+
+        assertEquals(4, results.size());
+        assertTrue(names(results).contains("Dragon harpoon"));
+        assertTrue(names(results).contains("Rope"));
+        assertTrue(names(results).contains("Bucket"));
+        assertTrue(names(results).contains("Angler hat"));
+        assertFalse(names(results).contains("Rune scimitar"));
+        assertFalse(names(results).contains("Granite hammer"));
+    }
+
+    @Test
+    public void gotrFindsPouchesAndChisel()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(670, "Large pouch", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(671, "Chisel", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(672, "Binding necklace", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(673, "Pure essence", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(674, "Rune platebody", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("gotr pouch", index);
+
+        assertEquals(4, results.size());
+        assertTrue(names(results).contains("Large pouch"));
+        assertTrue(names(results).contains("Chisel"));
+        assertTrue(names(results).contains("Binding necklace"));
+        assertTrue(names(results).contains("Pure essence"));
+        assertFalse(names(results).contains("Rune platebody"));
+    }
+
+    @Test
+    public void mahoganyHomesFindsConstructionSuppliesAndTeleports()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(680, "Saw", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(681, "Hammer", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(682, "Mahogany plank", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(683, "Steel bar", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(684, "Rune platebody", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(685, "Teleport to house", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("mahogany homes", index);
+
+        assertEquals(5, results.size());
+        assertTrue(names(results).contains("Saw"));
+        assertTrue(names(results).contains("Hammer"));
+        assertTrue(names(results).contains("Mahogany plank"));
+        assertTrue(names(results).contains("Steel bar"));
+        assertTrue(names(results).contains("Teleport to house"));
+        assertFalse(names(results).contains("Rune platebody"));
+    }
+
+    @Test
+    public void blastFurnaceFindsSmithingUtility()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(690, "Coal bag", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(691, "Ice gloves", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(692, "Goldsmith gauntlets", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(693, "Stamina potion(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(694, "Spade", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(695, "Charcoal", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("blast furnace", index);
+
+        assertEquals(4, results.size());
+        assertTrue(names(results).contains("Coal bag"));
+        assertTrue(names(results).contains("Ice gloves"));
+        assertTrue(names(results).contains("Goldsmith gauntlets"));
+        assertTrue(names(results).contains("Stamina potion(4)"));
+        assertFalse(names(results).contains("Spade"));
+        assertFalse(names(results).contains("Charcoal"));
+    }
+
     private static String names(List<SemanticSearchResult> results)
     {
         StringBuilder builder = new StringBuilder();

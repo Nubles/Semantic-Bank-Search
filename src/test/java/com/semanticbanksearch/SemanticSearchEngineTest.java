@@ -958,6 +958,64 @@ public class SemanticSearchEngineTest
         assertFalse(names(results).contains("Varrock teleport"));
     }
 
+    @Test
+    public void skillingMinigameQueriesDoNotBleedAcrossActivities()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(780, "Steel axe", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(781, "Tinderbox", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(782, "Dragon harpoon", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(783, "Large pouch", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(784, "Coal bag", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("wintertodt supplies", index);
+
+        assertEquals(2, results.size());
+        assertTrue(names(results).contains("Steel axe"));
+        assertTrue(names(results).contains("Tinderbox"));
+        assertFalse(names(results).contains("Dragon harpoon"));
+        assertFalse(names(results).contains("Large pouch"));
+        assertFalse(names(results).contains("Coal bag"));
+    }
+
+    @Test
+    public void birdhouseRunDoesNotMatchGenericLogsEverywhere()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(790, "Oak bird house", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(791, "Clockwork", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(792, "Maple logs", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(793, "Bow string", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(794, "Knife", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("birdhouse run", index);
+
+        assertEquals(3, results.size());
+        assertTrue(names(results).contains("Oak bird house"));
+        assertTrue(names(results).contains("Clockwork"));
+        assertTrue(names(results).contains("Maple logs"));
+        assertFalse(names(results).contains("Bow string"));
+        assertFalse(names(results).contains("Knife"));
+    }
+
+    @Test
+    public void blastFurnaceDoesNotMatchGenericSmithingPrepOnlyItems()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(800, "Coal bag", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(801, "Ice gloves", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(802, "Gold ore", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(803, "Hammer", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("blast furnace", index);
+
+        assertEquals(3, results.size());
+        assertTrue(names(results).contains("Coal bag"));
+        assertTrue(names(results).contains("Ice gloves"));
+        assertTrue(names(results).contains("Gold ore"));
+        assertFalse(names(results).contains("Hammer"));
+    }
+
     private static String names(List<SemanticSearchResult> results)
     {
         StringBuilder builder = new StringBuilder();

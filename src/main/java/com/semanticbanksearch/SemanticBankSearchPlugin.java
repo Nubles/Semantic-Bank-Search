@@ -123,6 +123,7 @@ public class SemanticBankSearchPlugin extends Plugin
 		bankOpen = isBankOpen();
 		if (config.rememberObservedStorage())
 		{
+			markAllStorageSourcesNotVisible();
 			observeSafeStorage(System.currentTimeMillis());
 		}
 		else
@@ -344,11 +345,10 @@ public class SemanticBankSearchPlugin extends Plugin
 		{
 			ObservedStorageSource source = snapshot.getSource();
 			currentlyVisibleSourceKeys.add(source.key());
-			index.replaceVisibleSourceItems(
-				source.getSourceType(),
-				source.getSourceName(),
+			changed |= SafeStorageObservation.replaceVisibleSourceItemsIfChanged(
+				index,
+				source,
 				snapshot.getItems());
-			changed = true;
 		}
 
 		for (String previousKey : new HashSet<>(visibleStorageSourceKeys))
@@ -376,10 +376,7 @@ public class SemanticBankSearchPlugin extends Plugin
 			return;
 		}
 
-		for (ObservedStorageSource source : ObservedStorageSource.safeDirectInventorySources())
-		{
-			index.markSourceNotVisible(source.getSourceType(), source.getSourceName());
-		}
+		SafeStorageObservation.markAllSafeStorageSourcesNotVisible(index);
 		visibleStorageSourceKeys.clear();
 	}
 

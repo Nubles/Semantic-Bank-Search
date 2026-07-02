@@ -1039,6 +1039,68 @@ public class SemanticSearchEngineTest
         assertTrue(seedDibber.isHighlightable());
     }
 
+    @Test
+    public void kourendTravelFindsXericsAndMemoirs()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(910, "Xeric's talisman", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(911, "Kharedst's memoirs", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(912, "Games necklace(8)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("kourend teleport", index);
+
+        assertTrue(names(results).contains("Xeric's talisman"));
+        assertTrue(names(results).contains("Kharedst's memoirs"));
+        assertFalse(names(results).contains("Games necklace(8)"));
+    }
+
+    @Test
+    public void fossilIslandTravelFindsDigsitePendant()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(920, "Digsite pendant", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(921, "Numulite", 250, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(922, "Varrock teleport", 3, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("fossil island travel", index);
+
+        assertTrue(names(results).contains("Digsite pendant"));
+        assertTrue(names(results).contains("Numulite"));
+        assertFalse(names(results).contains("Varrock teleport"));
+    }
+
+    @Test
+    public void fairyRingItemsFindsDramenStaff()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(930, "Dramen staff", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(931, "Lunar staff", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(932, "Staff of air", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("fairy ring items", index);
+
+        assertTrue(names(results).contains("Dramen staff"));
+        assertTrue(names(results).contains("Lunar staff"));
+        assertFalse(names(results).contains("Staff of air"));
+    }
+
+    @Test
+    public void fremennikTravelFindsLyreAndGamesNecklace()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(940, "Enchanted lyre", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(941, "Games necklace(8)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(942, "Lunar isle teleport", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(943, "Shantay pass", 5, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("fremennik travel", index);
+
+        assertTrue(names(results).contains("Enchanted lyre"));
+        assertTrue(names(results).contains("Games necklace(8)"));
+        assertTrue(names(results).contains("Lunar isle teleport"));
+        assertFalse(names(results).contains("Shantay pass"));
+    }
+
     private static String names(List<SemanticSearchResult> results)
     {
         StringBuilder builder = new StringBuilder();

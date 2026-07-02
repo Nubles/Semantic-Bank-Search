@@ -1076,12 +1076,29 @@ public class SemanticSearchEngineTest
         index.record(930, "Dramen staff", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
         index.record(931, "Lunar staff", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
         index.record(932, "Staff of air", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(933, "Shantay pass", 5, StorageSourceType.BANK, "Bank", true, 1_000L);
 
-        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("fairy ring items", index);
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("fairy ring access", index);
 
         assertTrue(names(results).contains("Dramen staff"));
         assertTrue(names(results).contains("Lunar staff"));
         assertFalse(names(results).contains("Staff of air"));
+        assertFalse(names(results).contains("Shantay pass"));
+    }
+
+    @Test
+    public void wildyTeleportFindsWildernessEscapeItems()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(934, "Royal seed pod", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(935, "Wilderness sword 4", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(936, "Shantay pass", 5, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("wildy teleport", index);
+
+        assertTrue(names(results).contains("Royal seed pod"));
+        assertTrue(names(results).contains("Wilderness sword 4"));
+        assertFalse(names(results).contains("Shantay pass"));
     }
 
     @Test

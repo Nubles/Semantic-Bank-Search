@@ -20,7 +20,7 @@ final class TeleportRules
                 SemanticLibrary.scores(),
                 100),
             SemanticLibrary.rule(
-                "Desert access",
+                "Desert routes",
                 "Gets you into or around the desert.",
                 SemanticLibrary.aliases("desert travel", "desert teleport", "shantay", "alkharid", "pollnivneach", "nardah"),
                 SemanticLibrary.patterns("desert amulet", "pharaoh's sceptre", "camulet", "slayer ring", "ring of dueling", "shantay pass", "waterskin"),
@@ -69,7 +69,7 @@ final class TeleportRules
                     "numulite", 10),
                 115),
             SemanticLibrary.rule(
-                "Fairy ring access",
+                "Fairy ring items",
                 "Items used to access fairy rings.",
                 SemanticLibrary.aliases("fairy ring", "fairy rings", "fairy ring items", "fairy ring access"),
                 SemanticLibrary.patterns("dramen staff", "lunar staff", "quest cape"),

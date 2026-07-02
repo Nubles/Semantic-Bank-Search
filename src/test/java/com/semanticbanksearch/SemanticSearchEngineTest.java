@@ -1025,16 +1025,18 @@ public class SemanticSearchEngineTest
 
         List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("herb run", index);
 
-        assertTrue(names(results).contains("Ranarr seed"));
-        assertTrue(names(results).contains("Seed dibber"));
-        for (SemanticSearchResult result : results)
-        {
-            if (result.getItemName().equals("Ranarr seed"))
-            {
-                assertEquals("Seed Vault", result.getSourceName());
-                assertFalse(result.isHighlightable());
-            }
-        }
+        SemanticSearchResult ranarrSeed = results.stream()
+            .filter(result -> result.getItemName().equals("Ranarr seed"))
+            .findFirst()
+            .orElseThrow(AssertionError::new);
+        SemanticSearchResult seedDibber = results.stream()
+            .filter(result -> result.getItemName().equals("Seed dibber"))
+            .findFirst()
+            .orElseThrow(AssertionError::new);
+
+        assertEquals("Seed Vault", ranarrSeed.getSourceName());
+        assertFalse(ranarrSeed.isHighlightable());
+        assertTrue(seedDibber.isHighlightable());
     }
 
     private static String names(List<SemanticSearchResult> results)

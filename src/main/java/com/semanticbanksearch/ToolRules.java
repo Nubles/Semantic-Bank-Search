@@ -27,9 +27,20 @@ final class ToolRules
                 SemanticLibrary.scores(),
                 100),
             SemanticLibrary.rule(
+                "Quest utility",
+                "Common tools used by quests and achievement diaries.",
+                SemanticLibrary.aliases("quest tools", "quest utility", "diary tools", "achievement diary tools"),
+                SemanticLibrary.patterns("ghostspeak amulet", "rope", "spade", "pickaxe", "axe", "knife", "bucket", "empty pot", "pestle and mortar", "vial", "needle", "thread", "hammer", "chisel", "light source", "lantern", "tinderbox"),
+                SemanticLibrary.scores(
+                    "ghostspeak amulet", 30,
+                    "rope", 20,
+                    "spade", 20,
+                    "pickaxe", 15),
+                105),
+            SemanticLibrary.rule(
                 "General tools",
                 "General skilling or traversal tool.",
-                SemanticLibrary.aliases("tool", "utility", "rope", "spade", "lockpick"),
+                SemanticLibrary.aliases("tool", "rope", "spade", "lockpick"),
                 SemanticLibrary.patterns("spade", "rope", "lockpick", "tinderbox", "chisel", "pestle and mortar", "hammer", "saw", "knife"),
                 SemanticLibrary.scores(),
                 100));

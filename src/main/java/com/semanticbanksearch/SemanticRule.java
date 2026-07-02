@@ -22,7 +22,9 @@ public class SemanticRule
         "restoration",
         "slayer",
         "task",
-        "devil");
+        "devil",
+        "clue",
+        "desert");
 
     private final String category;
     private final String reason;

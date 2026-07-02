@@ -25,6 +25,16 @@ final class ProtectionRules
                 SemanticLibrary.aliases("shield", "defensive gear", "dragon protection"),
                 SemanticLibrary.patterns("shield", "defender", "ward", "book of"),
                 SemanticLibrary.scores(),
-                100));
+                100),
+            SemanticLibrary.rule(
+                "Desert protection",
+                "Protects against desert heat and supports desert travel.",
+                SemanticLibrary.aliases("desert protection", "desert survival", "heat protection"),
+                SemanticLibrary.patterns("waterskin", "desert robes", "desert shirt", "desert boots", "desert amulet", "circlet of water", "water tiara", "shantay pass"),
+                SemanticLibrary.scores(
+                    "waterskin", 30,
+                    "circlet of water", 30,
+                    "desert amulet", 20),
+                110));
     }
 }

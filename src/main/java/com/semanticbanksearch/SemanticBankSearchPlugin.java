@@ -305,10 +305,14 @@ public class SemanticBankSearchPlugin extends Plugin
 
 	void startObservedStorageLifecycle(long now)
 	{
-		markAllStorageSourcesNotVisible();
+		boolean clearedVisibleStorage = markAllStorageSourcesNotVisible();
 		if (config != null && config.rememberObservedStorage())
 		{
 			observeSafeStorage(now);
+		}
+		else if (clearedVisibleStorage)
+		{
+			persist(now);
 		}
 	}
 
@@ -411,15 +415,16 @@ public class SemanticBankSearchPlugin extends Plugin
 		return changed;
 	}
 
-	private void markAllStorageSourcesNotVisible()
+	private boolean markAllStorageSourcesNotVisible()
 	{
 		if (index == null)
 		{
-			return;
+			return false;
 		}
 
-		SafeStorageObservation.markAllSafeStorageSourcesNotVisible(index);
+		boolean changed = SafeStorageObservation.markAllSafeStorageSourcesNotVisible(index);
 		visibleStorageSourceKeys.clear();
+		return changed;
 	}
 
 	private void markSourceKeyNotVisible(String sourceKey)

@@ -20,17 +20,20 @@ final class SafeStorageObservation
         return changed;
     }
 
-    static void markAllSafeStorageSourcesNotVisible(StorageIndex index)
+    static boolean markAllSafeStorageSourcesNotVisible(StorageIndex index)
     {
         if (index == null)
         {
-            return;
+            return false;
         }
 
+        boolean changed = false;
         for (ObservedStorageSource source : ObservedStorageSource.safeDirectInventorySources())
         {
+            changed |= !visibleSourceState(index, source).isEmpty();
             index.markSourceNotVisible(source.getSourceType(), source.getSourceName());
         }
+        return changed;
     }
 
     private static List<String> visibleSourceState(StorageIndex index, ObservedStorageSource source)

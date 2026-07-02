@@ -67,6 +67,21 @@ public class SemanticBankSearchPluginTest
         assertEquals(1, persistCount.get());
     }
 
+    @Test
+    public void startupWithRememberingDisabledPersistsClearedVisibleStatus()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(101, "Ranarr seed", 5, StorageSourceType.OTHER_STORAGE, "Seed Vault", true, 1_000L);
+        AtomicInteger persistCount = new AtomicInteger();
+        SemanticBankSearchPlugin plugin = pluginWith(index, noVisibleStorageScanner(), config(false));
+        plugin.setObservedStoragePersistenceForTesting(ignored -> persistCount.incrementAndGet());
+
+        plugin.startObservedStorageLifecycle(2_000L);
+
+        assertFalse(index.items().get(0).isCurrentlyVisible());
+        assertEquals(1, persistCount.get());
+    }
+
     private static SemanticBankSearchPlugin pluginWith(
         StorageIndex index,
         ObservedStorageScanner scanner,

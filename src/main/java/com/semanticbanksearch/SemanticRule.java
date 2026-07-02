@@ -24,7 +24,11 @@ public class SemanticRule
         "task",
         "devil",
         "clue",
-        "desert");
+        "desert",
+        "skilling",
+        "boost",
+        "boosts",
+        "runes");
 
     private final String category;
     private final String reason;

@@ -23,7 +23,7 @@ final class PotionRules
                 "Run energy restoration",
                 "Restores or preserves run energy.",
                 SemanticLibrary.aliases("stamina", "run energy", "energy potion", "restore run"),
-                SemanticLibrary.patterns("stamina potion", "energy potion", "super energy", "strange fruit"),
+                SemanticLibrary.patterns("stamina potion", "energy potion", "super energy", "strange fruit", "stamina mix", "ring of endurance"),
                 SemanticLibrary.scores(),
                 100),
             SemanticLibrary.rule(
@@ -44,15 +44,26 @@ final class PotionRules
                 "Combat boosts",
                 "Boosts combat stats.",
                 SemanticLibrary.aliases("combat boost", "melee boost", "strength boost", "attack boost", "defence boost"),
-                SemanticLibrary.patterns("combat potion", "super combat", "attack potion", "strength potion", "defence potion", "divine super combat"),
+                SemanticLibrary.patterns("combat potion", "super combat", "attack potion", "strength potion", "defence potion", "divine super combat", "super attack", "super strength", "super defence", "divine super attack", "divine super strength", "divine super defence"),
                 SemanticLibrary.scores(),
                 100),
             SemanticLibrary.rule(
                 "Ranged and magic boosts",
                 "Boosts ranged or magic.",
                 SemanticLibrary.aliases("ranged boost", "range boost", "magic boost", "mage boost"),
-                SemanticLibrary.patterns("ranging potion", "bastion potion", "magic potion", "forgotten brew", "imbued heart"),
+                SemanticLibrary.patterns("ranging potion", "bastion potion", "magic potion", "forgotten brew", "imbued heart", "divine ranging potion", "divine magic potion", "saturated heart"),
                 SemanticLibrary.scores(),
+                100),
+            SemanticLibrary.rule(
+                "Skilling boosts",
+                "Temporary boosts for skilling levels.",
+                SemanticLibrary.aliases("skilling boost", "skill boost", "boost farming", "boost mining", "boost woodcutting", "boost crafting"),
+                SemanticLibrary.patterns("botanical pie", "garden pie", "mushroom pie", "admiral pie", "wild pie", "spicy stew", "dwarven stout", "mature dwarven stout", "chef's delight", "wizard's mind bomb"),
+                SemanticLibrary.scores(
+                    "spicy stew", 30,
+                    "botanical pie", 20,
+                    "garden pie", 20,
+                    "mushroom pie", 20),
                 100));
     }
 }

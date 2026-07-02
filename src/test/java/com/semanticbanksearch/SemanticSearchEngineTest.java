@@ -517,6 +517,105 @@ public class SemanticSearchEngineTest
         assertFalse(names(results).contains("Desert robes"));
     }
 
+    @Test
+    public void gracefulAndSkillingOutfitsAreFoundBySkillingOutfitQuery()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(350, "Graceful hood", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(351, "Prospector jacket", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(352, "Angler hat", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(353, "Rune platebody", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("skilling outfit", index);
+
+        assertEquals(3, results.size());
+        assertTrue(names(results).contains("Graceful hood"));
+        assertTrue(names(results).contains("Prospector jacket"));
+        assertTrue(names(results).contains("Angler hat"));
+        assertFalse(names(results).contains("Rune platebody"));
+    }
+
+    @Test
+    public void comboFoodRanksBeforeSlowFoodForFastFood()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(360, "Shark", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(361, "Cooked karambwan", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(362, "Saradomin brew(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("fastest food", index);
+
+        assertEquals(3, results.size());
+        assertEquals("Saradomin brew(4)", results.get(0).getItemName());
+        assertEquals("Cooked karambwan", results.get(1).getItemName());
+        assertEquals("Shark", results.get(2).getItemName());
+    }
+
+    @Test
+    public void alchemyRunesFindsNatureFireAndStaff()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(370, "Nature rune", 100, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(371, "Fire rune", 100, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(372, "Staff of fire", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(373, "Law rune", 100, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(374, "Rune platebody", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("alchemy runes", index);
+
+        assertEquals(3, results.size());
+        assertTrue(names(results).contains("Nature rune"));
+        assertTrue(names(results).contains("Fire rune"));
+        assertTrue(names(results).contains("Staff of fire"));
+        assertFalse(names(results).contains("Law rune"));
+        assertFalse(names(results).contains("Rune platebody"));
+    }
+
+    @Test
+    public void skillingBoostDoesNotReturnCombatBoosts()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(380, "Botanical pie", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(381, "Super combat potion(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(382, "Ranging potion(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("skilling boost", index);
+
+        assertEquals(1, results.size());
+        assertEquals("Botanical pie", results.get(0).getItemName());
+    }
+
+    @Test
+    public void bindingRunesFindsEarthWaterAndNatureRunes()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(390, "Earth rune", 100, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(391, "Water rune", 100, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(392, "Nature rune", 100, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(393, "Fire rune", 100, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("binding runes", index);
+
+        assertEquals(3, results.size());
+        assertTrue(names(results).contains("Earth rune"));
+        assertTrue(names(results).contains("Water rune"));
+        assertTrue(names(results).contains("Nature rune"));
+        assertFalse(names(results).contains("Fire rune"));
+    }
+
+    @Test
+    public void skillingOutfitDoesNotMatchAnglerfish()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(400, "Angler hat", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(401, "Anglerfish", 5, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("skilling outfit", index);
+
+        assertEquals(1, results.size());
+        assertEquals("Angler hat", results.get(0).getItemName());
+    }
+
     private static String names(List<SemanticSearchResult> results)
     {
         StringBuilder builder = new StringBuilder();

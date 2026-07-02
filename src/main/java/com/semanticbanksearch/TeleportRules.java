@@ -13,14 +13,14 @@ final class TeleportRules
     {
         return Arrays.asList(
             SemanticLibrary.rule(
-                "Barrows teleports",
+                "Barrows",
                 "Gets you near Barrows.",
                 SemanticLibrary.aliases("teleport near barrows", "barrows teleport", "mortton teleport", "morytania teleport"),
                 SemanticLibrary.patterns("barrows teleport", "mort'ton teleport", "morytania legs", "shades of mort'ton", "drakan's medallion"),
                 SemanticLibrary.scores(),
                 100),
             SemanticLibrary.rule(
-                "Desert routes",
+                "Kharidian desert",
                 "Gets you into or around the desert.",
                 SemanticLibrary.aliases("desert travel", "desert teleport", "shantay", "alkharid", "pollnivneach", "nardah"),
                 SemanticLibrary.patterns("desert amulet", "pharaoh's sceptre", "camulet", "slayer ring", "ring of dueling", "shantay pass", "waterskin"),
@@ -30,7 +30,7 @@ final class TeleportRules
                     "shantay pass", 20),
                 110),
             SemanticLibrary.rule(
-                "Morytania travel",
+                "Morytania",
                 "Gets you into or around Morytania.",
                 SemanticLibrary.aliases("morytania travel", "morytania teleport", "canifis", "burgh de rott", "mortton"),
                 SemanticLibrary.patterns("morytania legs", "ecto", "ectophial", "drakan's medallion", "barrows teleport", "mort'ton teleport", "fenkenstrain"),
@@ -50,7 +50,7 @@ final class TeleportRules
                     "ring of wealth", 20),
                 110),
             SemanticLibrary.rule(
-                "Kourend travel",
+                "Kourend Zeah",
                 "Gets you around Great Kourend and Zeah.",
                 SemanticLibrary.aliases("kourend travel", "kourend teleport", "zeah travel", "zeah teleport", "xeric teleport"),
                 SemanticLibrary.patterns("xeric's talisman", "kharedst's memoirs", "book of the dead", "skills necklace", "rada's blessing"),
@@ -60,7 +60,7 @@ final class TeleportRules
                     "book of the dead", 25),
                 115),
             SemanticLibrary.rule(
-                "Fossil Island travel",
+                "Fossil Island",
                 "Gets you to or supports Fossil Island travel.",
                 SemanticLibrary.aliases("fossil island travel", "fossil island teleport", "digsite pendant fossil", "mushroom meadow"),
                 SemanticLibrary.patterns("digsite pendant", "numulite", "mushroom meadow", "volcanic mine"),
@@ -69,7 +69,7 @@ final class TeleportRules
                     "numulite", 10),
                 115),
             SemanticLibrary.rule(
-                "Fairy ring items",
+                "Fairy rings",
                 "Items used to access fairy rings.",
                 SemanticLibrary.aliases("fairy ring", "fairy rings", "fairy ring items", "fairy ring access"),
                 SemanticLibrary.patterns("dramen staff", "lunar staff", "quest cape"),
@@ -79,7 +79,7 @@ final class TeleportRules
                     "quest cape", 20),
                 115),
             SemanticLibrary.rule(
-                "Fremennik travel",
+                "Fremennik region",
                 "Gets you around Fremennik areas, Lunar Isle, and Waterbirth.",
                 SemanticLibrary.aliases("fremennik travel", "fremennik teleport", "rellekka teleport", "lunar isle", "waterbirth teleport"),
                 SemanticLibrary.patterns("enchanted lyre", "games necklace", "lunar isle teleport", "waterbirth teleport", "fremennik sea boots"),
@@ -90,7 +90,7 @@ final class TeleportRules
                     "games necklace", 20),
                 115),
             SemanticLibrary.rule(
-                "Kandarin and Ardougne travel",
+                "Kandarin Ardougne",
                 "Gets you around Ardougne, Camelot, Catherby, and Kandarin.",
                 SemanticLibrary.aliases("kandarin travel", "ardougne travel", "ardougne teleport", "camelot travel", "catherby teleport"),
                 SemanticLibrary.patterns("ardougne cloak", "camelot teleport", "combat bracelet", "skills necklace", "kandarin headgear"),
@@ -117,7 +117,7 @@ final class TeleportRules
                 SemanticLibrary.scores(),
                 100),
             SemanticLibrary.rule(
-                "Teleport tablets",
+                "Spell tablets",
                 "Single-use teleport tablets.",
                 SemanticLibrary.aliases("teleport tablet", "tele tabs", "house tab", "spell tablet"),
                 SemanticLibrary.patterns("teleport", "tablet", "redirected house tablet"),

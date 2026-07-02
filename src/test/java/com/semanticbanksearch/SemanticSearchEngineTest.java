@@ -314,7 +314,7 @@ public class SemanticSearchEngineTest
 
         assertEquals(1, results.size());
         assertEquals("Barrows teleport", results.get(0).getItemName());
-        assertEquals("Barrows teleports", results.get(0).getCategory());
+        assertEquals("Barrows", results.get(0).getCategory());
     }
 
     @Test
@@ -1061,12 +1061,18 @@ public class SemanticSearchEngineTest
         index.record(920, "Digsite pendant", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
         index.record(921, "Numulite", 250, StorageSourceType.BANK, "Bank", true, 1_000L);
         index.record(922, "Varrock teleport", 3, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(923, "Xeric's talisman", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(924, "Enchanted lyre", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(925, "Ardougne cloak", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
 
         List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("fossil island travel", index);
 
         assertTrue(names(results).contains("Digsite pendant"));
         assertTrue(names(results).contains("Numulite"));
         assertFalse(names(results).contains("Varrock teleport"));
+        assertFalse(names(results).contains("Xeric's talisman"));
+        assertFalse(names(results).contains("Enchanted lyre"));
+        assertFalse(names(results).contains("Ardougne cloak"));
     }
 
     @Test

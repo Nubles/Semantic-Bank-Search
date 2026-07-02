@@ -616,6 +616,33 @@ public class SemanticSearchEngineTest
         assertEquals("Angler hat", results.get(0).getItemName());
     }
 
+    @Test
+    public void genericWeaponWordDoesNotMatchEveryWeaponRule()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(600, "Dragon mace", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(601, "Rune scimitar", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(602, "Magic shortbow", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("crush weapons", index);
+
+        assertEquals(1, results.size());
+        assertEquals("Dragon mace", results.get(0).getItemName());
+    }
+
+    @Test
+    public void genericToolWordDoesNotMatchEveryToolRule()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(610, "Sextant", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(611, "Harpoon", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(612, "Seed dibber", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("coordinate clue", index);
+
+        assertEquals(1, results.size());
+        assertEquals("Sextant", results.get(0).getItemName());
+    }
     private static String names(List<SemanticSearchResult> results)
     {
         StringBuilder builder = new StringBuilder();

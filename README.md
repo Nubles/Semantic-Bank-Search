@@ -20,6 +20,6 @@ Example searches:
 
 The bundled semantic database is local static data. It covers common teleports, potions, food, combat equipment, boss prep, slayer prep, tools, skilling supplies, skilling workflows, minigame prep, clue utility, quest/diary utility, travel, and protection items. It is intentionally approximate and avoids runtime network calls.
 
-The plugin is local-only. It reads visible bank items, remembers observed storage locally, and highlights matching visible bank items. Remembered storage only includes items the client has observed; it cannot infer items from tabs, accounts, or storage containers that have not been opened in RuneLite.
+The plugin is local-only. It reads visible bank items plus safe observed storage containers such as Seed Vault and Group Storage, remembers those observations locally, and highlights matching visible bank items. Remembered storage only includes items the client has observed; it cannot infer items from tabs, accounts, or storage containers that have not been opened in RuneLite. POH storage remains limited to sources that RuneLite exposes clearly and safely.
 
 It does not click, withdraw, deposit, move, tag, modify menus, use external services, or send bank contents anywhere.

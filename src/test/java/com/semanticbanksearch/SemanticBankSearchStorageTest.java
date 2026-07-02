@@ -33,6 +33,22 @@ public class SemanticBankSearchStorageTest
     }
 
     @Test
+    public void roundTripPreservesNonBankStorageSource()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(100, "Ranarr seed", 10, StorageSourceType.OTHER_STORAGE, "Seed Vault", true, 1_000L);
+
+        String json = SemanticBankSearchStorage.serialize(new Gson(), index);
+        StorageIndex loaded = SemanticBankSearchStorage.deserialize(new Gson(), json);
+
+        assertEquals("Ranarr seed", loaded.items().get(0).getName());
+        assertEquals(10, loaded.items().get(0).getQuantity());
+        assertEquals(StorageSourceType.OTHER_STORAGE, loaded.items().get(0).getSourceType());
+        assertEquals("Seed Vault", loaded.items().get(0).getSourceName());
+        assertTrue(loaded.items().get(0).isCurrentlyVisible());
+    }
+
+    @Test
     public void malformedItemFieldsDeserializeIntoUsableStorageIndex()
     {
         String json = "{\"items\":[{\"itemId\":100,\"name\":\" Prayer potion(4) \",\"quantity\":2,"

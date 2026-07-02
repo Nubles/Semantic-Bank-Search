@@ -1016,6 +1016,27 @@ public class SemanticSearchEngineTest
         assertFalse(names(results).contains("Hammer"));
     }
 
+    @Test
+    public void nonBankObservedStorageItemsAreSearchableButNotHighlightable()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(900, "Ranarr seed", 10, StorageSourceType.OTHER_STORAGE, "Seed Vault", true, 1_000L);
+        index.record(901, "Seed dibber", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("herb run", index);
+
+        assertTrue(names(results).contains("Ranarr seed"));
+        assertTrue(names(results).contains("Seed dibber"));
+        for (SemanticSearchResult result : results)
+        {
+            if (result.getItemName().equals("Ranarr seed"))
+            {
+                assertEquals("Seed Vault", result.getSourceName());
+                assertFalse(result.isHighlightable());
+            }
+        }
+    }
+
     private static String names(List<SemanticSearchResult> results)
     {
         StringBuilder builder = new StringBuilder();

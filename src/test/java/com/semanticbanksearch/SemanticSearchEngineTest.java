@@ -366,6 +366,71 @@ public class SemanticSearchEngineTest
         assertFalse(names(results).contains("Spade"));
     }
 
+
+    @Test
+    public void dragonSlayerTaskFindsAntifireAndDragonWeapons()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(280, "Extended antifire(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(281, "Dragon hunter lance", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(282, "Anti-dragon shield", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(283, "Lobster pot", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("dragon slayer task", index);
+
+        assertEquals(3, results.size());
+        assertTrue(names(results).contains("Extended antifire(4)"));
+        assertTrue(names(results).contains("Dragon hunter lance"));
+        assertTrue(names(results).contains("Anti-dragon shield"));
+        assertFalse(names(results).contains("Lobster pot"));
+    }
+
+    @Test
+    public void dustDevilTaskFindsMaskAndBurstRunes()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(290, "Slayer helmet", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(291, "Facemask", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(292, "Death rune", 100, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(293, "Dragon hunter lance", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(294, "Occult necklace", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(295, "Rock hammer", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(296, "Rune platebody", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("dust devil task", index);
+
+        assertEquals(3, results.size());
+        assertTrue(names(results).contains("Slayer helmet"));
+        assertTrue(names(results).contains("Facemask"));
+        assertTrue(names(results).contains("Death rune"));
+        assertFalse(names(results).contains("Dragon hunter lance"));
+        assertFalse(names(results).contains("Occult necklace"));
+        assertFalse(names(results).contains("Rock hammer"));
+        assertFalse(names(results).contains("Rune platebody"));
+    }
+
+    @Test
+    public void basiliskTaskFindsMirrorShield()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(300, "Mirror shield", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(301, "V's shield", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(302, "Dragon hunter lance", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(303, "Rock hammer", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(304, "Facemask", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(305, "Bronze shield", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("basilisk task", index);
+
+        assertEquals(2, results.size());
+        assertTrue(names(results).contains("Mirror shield"));
+        assertTrue(names(results).contains("V's shield"));
+        assertFalse(names(results).contains("Dragon hunter lance"));
+        assertFalse(names(results).contains("Rock hammer"));
+        assertFalse(names(results).contains("Facemask"));
+        assertFalse(names(results).contains("Bronze shield"));
+    }
+
     private static String names(List<SemanticSearchResult> results)
     {
         StringBuilder builder = new StringBuilder();

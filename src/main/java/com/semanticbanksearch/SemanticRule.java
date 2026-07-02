@@ -19,7 +19,10 @@ public class SemanticRule
         "supplies",
         "protection",
         "prep",
-        "restoration");
+        "restoration",
+        "slayer",
+        "task",
+        "devil");
 
     private final String category;
     private final String reason;

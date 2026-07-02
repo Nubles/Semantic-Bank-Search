@@ -19,6 +19,7 @@ public final class SemanticLibrary
         rules.addAll(FoodRules.create());
         rules.addAll(TeleportRules.create());
         rules.addAll(BossRules.create());
+        rules.addAll(SlayerRules.create());
         rules.addAll(CombatRules.create());
         rules.addAll(ProtectionRules.create());
         rules.addAll(ToolRules.create());

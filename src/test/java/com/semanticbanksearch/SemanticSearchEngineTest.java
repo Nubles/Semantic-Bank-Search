@@ -798,6 +798,166 @@ public class SemanticSearchEngineTest
         assertFalse(names(results).contains("Charcoal"));
     }
 
+    @Test
+    public void birdhouseRunFindsBirdhousesLogsAndDigsiteTravel()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(700, "Oak bird house", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(701, "Clockwork", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(702, "Teak logs", 100, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(703, "Digsite pendant", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(704, "Rune platebody", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("birdhouse run", index);
+
+        assertEquals(4, results.size());
+        assertTrue(names(results).contains("Oak bird house"));
+        assertTrue(names(results).contains("Clockwork"));
+        assertTrue(names(results).contains("Teak logs"));
+        assertTrue(names(results).contains("Digsite pendant"));
+        assertFalse(names(results).contains("Rune platebody"));
+    }
+
+    @Test
+    public void herbRunFindsFarmingToolsCompostAndTeleports()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(710, "Seed dibber", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(711, "Magic secateurs", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(712, "Ultracompost", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(713, "Skills necklace(6)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(714, "Rune platebody", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("herb run", index);
+
+        assertEquals(4, results.size());
+        assertTrue(names(results).contains("Seed dibber"));
+        assertTrue(names(results).contains("Magic secateurs"));
+        assertTrue(names(results).contains("Ultracompost"));
+        assertTrue(names(results).contains("Skills necklace(6)"));
+        assertFalse(names(results).contains("Rune platebody"));
+    }
+
+    @Test
+    public void glassCraftingFindsSandSeaweedAndPipe()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(720, "Bucket of sand", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(721, "Giant seaweed", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(722, "Glassblowing pipe", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(723, "Rune scimitar", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("glass crafting prep", index);
+
+        assertEquals(3, results.size());
+        assertTrue(names(results).contains("Bucket of sand"));
+        assertTrue(names(results).contains("Giant seaweed"));
+        assertTrue(names(results).contains("Glassblowing pipe"));
+        assertFalse(names(results).contains("Rune scimitar"));
+    }
+
+    @Test
+    public void fletchingPrepFindsLogsStringAndFeathers()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(730, "Maple logs", 100, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(731, "Knife", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(732, "Bow string", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(733, "Feather", 100, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(734, "Rune platebody", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("fletching prep", index);
+
+        assertEquals(4, results.size());
+        assertTrue(names(results).contains("Maple logs"));
+        assertTrue(names(results).contains("Knife"));
+        assertTrue(names(results).contains("Bow string"));
+        assertTrue(names(results).contains("Feather"));
+        assertFalse(names(results).contains("Rune platebody"));
+    }
+
+    @Test
+    public void smithingPrepDoesNotMatchPotionTeleportOrFishingSubstrings()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(740, "Iron ore", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(741, "Steel bar", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(742, "Coal bag", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(743, "Hammer", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(744, "Super restore(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(745, "Barrows teleport", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(746, "Barbarian rod", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("smithing prep", index);
+
+        assertEquals(4, results.size());
+        assertTrue(names(results).contains("Iron ore"));
+        assertTrue(names(results).contains("Steel bar"));
+        assertTrue(names(results).contains("Coal bag"));
+        assertTrue(names(results).contains("Hammer"));
+        assertFalse(names(results).contains("Super restore(4)"));
+        assertFalse(names(results).contains("Barrows teleport"));
+        assertFalse(names(results).contains("Barbarian rod"));
+    }
+
+    @Test
+    public void cookingPrepDoesNotMatchStrawberryOrPieceSubstrings()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(750, "Raw shark", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(751, "Raw karambwan", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(752, "Cooking gauntlets", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(753, "Strawberry", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(754, "Piece of cake", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("cooking prep", index);
+
+        assertEquals(3, results.size());
+        assertTrue(names(results).contains("Raw shark"));
+        assertTrue(names(results).contains("Raw karambwan"));
+        assertTrue(names(results).contains("Cooking gauntlets"));
+        assertFalse(names(results).contains("Strawberry"));
+        assertFalse(names(results).contains("Piece of cake"));
+    }
+
+    @Test
+    public void glassCraftingPrepDoesNotMatchSandwichSubstrings()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(760, "Bucket of sand", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(761, "Giant seaweed", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(762, "Glassblowing pipe", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(763, "Gnome sandwich", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("glass crafting prep", index);
+
+        assertEquals(3, results.size());
+        assertTrue(names(results).contains("Bucket of sand"));
+        assertTrue(names(results).contains("Giant seaweed"));
+        assertTrue(names(results).contains("Glassblowing pipe"));
+        assertFalse(names(results).contains("Gnome sandwich"));
+    }
+
+    @Test
+    public void treeRunDoesNotReturnGenericTeleports()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(770, "Oak sapling", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(771, "Spade", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(772, "Skills necklace(6)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(773, "Ring of dueling(8)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(774, "Varrock teleport", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("tree run", index);
+
+        assertEquals(4, results.size());
+        assertTrue(names(results).contains("Oak sapling"));
+        assertTrue(names(results).contains("Spade"));
+        assertTrue(names(results).contains("Skills necklace(6)"));
+        assertTrue(names(results).contains("Ring of dueling(8)"));
+        assertFalse(names(results).contains("Varrock teleport"));
+    }
+
     private static String names(List<SemanticSearchResult> results)
     {
         StringBuilder builder = new StringBuilder();

@@ -22,6 +22,7 @@ public class SemanticRule
         "restoration",
         "slayer",
         "task",
+        "run",
         "devil",
         "clue",
         "desert",

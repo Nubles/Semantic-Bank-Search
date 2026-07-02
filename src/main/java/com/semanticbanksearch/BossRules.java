@@ -1,0 +1,199 @@
+package com.semanticbanksearch;
+
+import java.util.Arrays;
+import java.util.List;
+
+final class BossRules
+{
+    private BossRules()
+    {
+    }
+
+    static List<SemanticRule> create()
+    {
+        return Arrays.asList(
+            SemanticLibrary.rule(
+                "Vorkath prep",
+                "Useful for Vorkath trips: dragonfire protection, ranged gear, bolts, and sustain.",
+                SemanticLibrary.aliases("vorkath", "vorkath gear", "vorkath prep", "vorkath setup"),
+                SemanticLibrary.patterns(
+                    "antifire",
+                    "super antifire",
+                    "extended super antifire",
+                    "dragonfire shield",
+                    "anti-dragon shield",
+                    "crossbow",
+                    "dragon hunter crossbow",
+                    "dragon crossbow",
+                    "ruby dragon bolts",
+                    "diamond dragon bolts",
+                    "salve amulet",
+                    "void knight",
+                    "elite void",
+                    "void ranger helm",
+                    "void mage helm",
+                    "void melee helm",
+                    "ranging potion",
+                    "prayer potion",
+                    "super restore",
+                    "shark",
+                    "manta ray",
+                    "saradomin brew"),
+                SemanticLibrary.scores(
+                    "extended super antifire", 35,
+                    "super antifire", 30,
+                    "antifire", 25,
+                    "dragon hunter crossbow", 25,
+                    "dragon crossbow", 18,
+                    "diamond dragon bolts", 16,
+                    "ruby dragon bolts", 16),
+                120),
+            SemanticLibrary.rule(
+                "Zulrah prep",
+                "Useful for Zulrah trips: venom protection, magic/ranged switches, and sustain.",
+                SemanticLibrary.aliases("zulrah", "zulrah gear", "zulrah prep", "zulrah setup"),
+                SemanticLibrary.patterns(
+                    "anti-venom",
+                    "anti-venom+",
+                    "trident",
+                    "toxic trident",
+                    "sanguinesti",
+                    "magic shortbow",
+                    "blowpipe",
+                    "crystal bow",
+                    "ranging potion",
+                    "magic potion",
+                    "saradomin brew",
+                    "super restore",
+                    "shark",
+                    "manta ray"),
+                SemanticLibrary.scores(
+                    "anti-venom+", 35,
+                    "anti-venom", 30,
+                    "trident", 25,
+                    "blowpipe", 20),
+                120),
+            SemanticLibrary.rule(
+                "Fight Caves prep",
+                "Useful for Fight Caves: prayer restoration, ranged weapons, and long-trip sustain.",
+                SemanticLibrary.aliases("fight caves", "jad", "jad supplies", "fire cape", "fight caves supplies"),
+                SemanticLibrary.patterns(
+                    "prayer potion",
+                    "super restore",
+                    "saradomin brew",
+                    "ranging potion",
+                    "blowpipe",
+                    "crossbow",
+                    "crystal bow",
+                    "karil",
+                    "black d'hide",
+                    "manta ray",
+                    "shark"),
+                SemanticLibrary.scores(
+                    "prayer potion", 25,
+                    "super restore", 25,
+                    "saradomin brew", 20,
+                    "blowpipe", 20),
+                120),
+            SemanticLibrary.rule(
+                "Crypt prep",
+                "Useful for Barrows trips: prayer, magic gear, spade, and nearby teleports.",
+                SemanticLibrary.aliases("barrows gear", "barrows prep", "barrows setup", "barrows supplies"),
+                SemanticLibrary.patterns(
+                    "spade",
+                    "prayer potion",
+                    "super restore",
+                    "trident",
+                    "iban",
+                    "wind wave",
+                    "barrows teleport",
+                    "mort'ton teleport",
+                    "morytania legs",
+                    "drakan's medallion"),
+                SemanticLibrary.scores(
+                    "barrows teleport", 30,
+                    "spade", 25,
+                    "prayer potion", 20),
+                115),
+            SemanticLibrary.rule(
+                "God Wars prep",
+                "Useful for God Wars Dungeon: protection items, prayer, ropes, and combat supplies.",
+                SemanticLibrary.aliases("god wars", "gwd", "god wars gear", "god wars prep"),
+                SemanticLibrary.patterns(
+                    "rope",
+                    "prayer potion",
+                    "super restore",
+                    "saradomin item",
+                    "zamorak item",
+                    "bandos item",
+                    "armadyl item",
+                    "crossbow",
+                    "godsword",
+                    "stamina potion"),
+                SemanticLibrary.scores(
+                    "rope", 20,
+                    "prayer potion", 20,
+                    "super restore", 20),
+                110),
+            SemanticLibrary.rule(
+                "Dagannoth Kings prep",
+                "Useful for Dagannoth Kings trips: hybrid combat gear, prayer, antipoison, and teleports.",
+                SemanticLibrary.aliases("dagannoth kings", "dks", "rex prime supreme", "dk prep"),
+                SemanticLibrary.patterns(
+                    "antipoison",
+                    "super antipoison",
+                    "prayer potion",
+                    "super restore",
+                    "trident",
+                    "crossbow",
+                    "rune thrownaxe",
+                    "fremennik sea boots",
+                    "waterbirth teleport"),
+                SemanticLibrary.scores(
+                    "rune thrownaxe", 30,
+                    "antipoison", 20,
+                    "prayer potion", 20),
+                110),
+            SemanticLibrary.rule(
+                "Corporeal Beast prep",
+                "Useful for Corporeal Beast: spears, special attack weapons, and sustain.",
+                SemanticLibrary.aliases("corp", "corporeal beast", "corp prep", "corp gear"),
+                SemanticLibrary.patterns(
+                    "spear",
+                    "hasta",
+                    "dragon warhammer",
+                    "bandos godsword",
+                    "arclight",
+                    "prayer potion",
+                    "super restore",
+                    "stamina potion",
+                    "karambwan"),
+                SemanticLibrary.scores(
+                    "dragon warhammer", 30,
+                    "bandos godsword", 25,
+                    "spear", 20,
+                    "hasta", 20),
+                110),
+            SemanticLibrary.rule(
+                "Wilderness boss prep",
+                "Useful for wilderness boss trips: escape teleports, freezes, prayer, and risk-light supplies.",
+                SemanticLibrary.aliases("wilderness boss", "wildy boss", "wildy bosses", "wilderness pvm"),
+                SemanticLibrary.patterns(
+                    "royal seed pod",
+                    "burning amulet",
+                    "glory",
+                    "ice barrage",
+                    "blood rune",
+                    "death rune",
+                    "water rune",
+                    "prayer potion",
+                    "blighted super restore",
+                    "blighted manta ray",
+                    "black d'hide"),
+                SemanticLibrary.scores(
+                    "royal seed pod", 30,
+                    "burning amulet", 25,
+                    "blighted super restore", 20),
+                110));
+    }
+}

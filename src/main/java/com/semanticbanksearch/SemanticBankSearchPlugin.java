@@ -8,15 +8,14 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import javax.inject.Inject;
 import net.runelite.api.Client;
-import net.runelite.api.InventoryID;
-import net.runelite.api.Item;
 import net.runelite.api.ItemComposition;
-import net.runelite.api.ItemContainer;
 import net.runelite.api.events.GameTick;
-import net.runelite.api.widgets.InterfaceID;
+import net.runelite.api.widgets.ComponentID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
@@ -35,7 +34,6 @@ import net.runelite.client.ui.overlay.OverlayManager;
 public class SemanticBankSearchPlugin extends Plugin
 {
 	private static final String STORAGE_KEY = "index";
-	private static final String BANK_SOURCE_NAME = "Bank";
 	private static final long SAVE_INTERVAL_MILLIS = 60_000L;
 
 	private enum PanelMode
@@ -82,6 +80,8 @@ public class SemanticBankSearchPlugin extends Plugin
 	private final Object viewStateLock = new Object();
 	private StorageIndex index;
 	private SemanticSearchEngine engine;
+	private ObservedStorageScanner storageScanner;
+	private final Set<String> visibleStorageSourceKeys = new HashSet<>();
 	private SemanticBankSearchPanel panel;
 	private SemanticBankSearchOverlay overlay;
 	private NavigationButton navigationButton;
@@ -104,6 +104,11 @@ public class SemanticBankSearchPlugin extends Plugin
 			gson,
 			configManager.getConfiguration(SemanticBankSearchConfig.GROUP, STORAGE_KEY));
 		engine = new SemanticSearchEngine(SemanticLibrary.create());
+		storageScanner = new ObservedStorageScanner(
+			client::getItemContainer,
+			this::isWidgetVisible,
+			itemManager::canonicalize,
+			this::resolveItemName);
 		overlay = new SemanticBankSearchOverlay(config);
 		overlayManager.add(overlay);
 		panel = new SemanticBankSearchPanel(this::runSearch, this::showIndexedItems, this::clearSearch);
@@ -116,13 +121,13 @@ public class SemanticBankSearchPlugin extends Plugin
 		clientToolbar.addNavigation(navigationButton);
 
 		bankOpen = isBankOpen();
-		if (bankOpen && config.rememberObservedStorage())
+		if (config.rememberObservedStorage())
 		{
-			observeBank(System.currentTimeMillis());
+			observeSafeStorage(System.currentTimeMillis());
 		}
 		else
 		{
-			index.markSourceNotVisible(StorageSourceType.BANK, BANK_SOURCE_NAME);
+			markAllStorageSourcesNotVisible();
 		}
 		clearSearch();
 	}
@@ -130,10 +135,7 @@ public class SemanticBankSearchPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
-		if (index != null)
-		{
-			index.markSourceNotVisible(StorageSourceType.BANK, BANK_SOURCE_NAME);
-		}
+		markAllStorageSourcesNotVisible();
 		persist();
 		if (overlay != null)
 		{
@@ -148,6 +150,8 @@ public class SemanticBankSearchPlugin extends Plugin
 		panel = null;
 		overlay = null;
 		engine = null;
+		storageScanner = null;
+		visibleStorageSourceKeys.clear();
 		navigationButton = null;
 		index = null;
 		bankOpen = false;
@@ -164,20 +168,24 @@ public class SemanticBankSearchPlugin extends Plugin
 
 		long now = System.currentTimeMillis();
 		boolean currentlyBankOpen = isBankOpen();
-		boolean previouslyBankOpen = bankOpen;
 		bankOpen = currentlyBankOpen;
-		if (currentlyBankOpen && config.rememberObservedStorage())
+		if (config.rememberObservedStorage())
 		{
-			observeBank(now);
-			if (lastPersistMillis == 0L || now - lastPersistMillis >= SAVE_INTERVAL_MILLIS)
+			Set<String> previouslyVisibleSourceKeys = new HashSet<>(visibleStorageSourceKeys);
+			boolean changed = observeSafeStorage(now);
+			boolean visibilityLost = !visibleStorageSourceKeys.containsAll(previouslyVisibleSourceKeys);
+			if (lastPersistMillis == 0L || now - lastPersistMillis >= SAVE_INTERVAL_MILLIS || visibilityLost)
 			{
 				persist();
 			}
-			refreshActivePanelMode();
+			if (changed)
+			{
+				refreshActivePanelMode();
+			}
 		}
-		else if (!currentlyBankOpen && previouslyBankOpen)
+		else if (!visibleStorageSourceKeys.isEmpty())
 		{
-			index.markSourceNotVisible(StorageSourceType.BANK, BANK_SOURCE_NAME);
+			markAllStorageSourcesNotVisible();
 			refreshActivePanelMode();
 			persist();
 		}
@@ -320,43 +328,71 @@ public class SemanticBankSearchPlugin extends Plugin
 		}
 	}
 
-	private void observeBank(long now)
+	private boolean observeSafeStorage(long now)
 	{
-		if (index == null || !config.rememberObservedStorage())
+		if (index == null || storageScanner == null || !config.rememberObservedStorage())
+		{
+			return false;
+		}
+
+		List<ObservedStorageSnapshot> snapshots = storageScanner.scan(
+			ObservedStorageSource.safeDirectInventorySources(),
+			now);
+		Set<String> currentlyVisibleSourceKeys = new HashSet<>();
+		boolean changed = false;
+		for (ObservedStorageSnapshot snapshot : snapshots)
+		{
+			ObservedStorageSource source = snapshot.getSource();
+			currentlyVisibleSourceKeys.add(source.key());
+			index.replaceVisibleSourceItems(
+				source.getSourceType(),
+				source.getSourceName(),
+				snapshot.getItems());
+			changed = true;
+		}
+
+		for (String previousKey : new HashSet<>(visibleStorageSourceKeys))
+		{
+			if (!currentlyVisibleSourceKeys.contains(previousKey))
+			{
+				markSourceKeyNotVisible(previousKey);
+				changed = true;
+			}
+		}
+		if (!currentlyVisibleSourceKeys.equals(visibleStorageSourceKeys))
+		{
+			changed = true;
+		}
+		visibleStorageSourceKeys.clear();
+		visibleStorageSourceKeys.addAll(currentlyVisibleSourceKeys);
+		index.trimToMaximumEntries(config.maximumRememberedEntries());
+		return changed;
+	}
+
+	private void markAllStorageSourcesNotVisible()
+	{
+		if (index == null)
 		{
 			return;
 		}
 
-		List<ObservedItem> visibleItems = new ArrayList<>();
-		ItemContainer itemContainer = client.getItemContainer(InventoryID.BANK);
-		Item[] items = itemContainer == null ? null : itemContainer.getItems();
-		if (items != null)
+		for (ObservedStorageSource source : ObservedStorageSource.safeDirectInventorySources())
 		{
-			for (Item item : items)
-			{
-				if (item == null || item.getId() <= 0 || item.getQuantity() <= 0)
-				{
-					continue;
-				}
+			index.markSourceNotVisible(source.getSourceType(), source.getSourceName());
+		}
+		visibleStorageSourceKeys.clear();
+	}
 
-				int canonicalId = itemManager.canonicalize(item.getId());
-				String name = resolveItemName(canonicalId);
-				if (canonicalId > 0 && !name.isEmpty())
-				{
-					visibleItems.add(new ObservedItem(
-						canonicalId,
-						name,
-						item.getQuantity(),
-						StorageSourceType.BANK,
-						BANK_SOURCE_NAME,
-						true,
-						now));
-				}
+	private void markSourceKeyNotVisible(String sourceKey)
+	{
+		for (ObservedStorageSource source : ObservedStorageSource.safeDirectInventorySources())
+		{
+			if (source.key().equals(sourceKey))
+			{
+				index.markSourceNotVisible(source.getSourceType(), source.getSourceName());
+				return;
 			}
 		}
-
-		index.replaceVisibleSourceItems(StorageSourceType.BANK, BANK_SOURCE_NAME, visibleItems);
-		index.trimToMaximumEntries(config.maximumRememberedEntries());
 	}
 
 	private String resolveItemName(int itemId)
@@ -429,8 +465,13 @@ public class SemanticBankSearchPlugin extends Plugin
 
 	private boolean isBankOpen()
 	{
-		Widget bank = client.getWidget(InterfaceID.BANK, 1);
-		return bank != null && !bank.isHidden();
+		return isWidgetVisible(ComponentID.BANK_ITEM_CONTAINER);
+	}
+
+	private boolean isWidgetVisible(int packedComponentId)
+	{
+		Widget widget = client.getWidget(packedComponentId);
+		return widget != null && !widget.isHidden();
 	}
 
 	private static boolean isVisibleBankItem(ObservedItem item)

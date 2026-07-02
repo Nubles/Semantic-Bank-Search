@@ -105,6 +105,22 @@ public class StorageIndexTest
         assertEquals(102, index.items().get(1).getItemId());
     }
 
+    @Test
+    public void nonBankSourceItemsBecomeRememberedWhenSourceCloses()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(100, "Ranarr seed", 5, StorageSourceType.OTHER_STORAGE, "Seed Vault", true, 1_000L);
+
+        index.markSourceNotVisible(StorageSourceType.OTHER_STORAGE, "Seed Vault");
+
+        List<ObservedItem> items = index.items();
+        assertEquals(1, items.size());
+        assertEquals("Ranarr seed", items.get(0).getName());
+        assertEquals(StorageSourceType.OTHER_STORAGE, items.get(0).getSourceType());
+        assertEquals("Seed Vault", items.get(0).getSourceName());
+        assertFalse(items.get(0).isCurrentlyVisible());
+    }
+
     private static ObservedItem itemById(List<ObservedItem> items, int itemId)
     {
         for (ObservedItem item : items)

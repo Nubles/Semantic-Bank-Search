@@ -72,7 +72,7 @@ public class SemanticRule
 
         for (String alias : queryAliases)
         {
-            if (containsPhrase(normalizedQuery, alias))
+            if (matchesAlias(normalizedQuery, alias))
             {
                 return true;
             }
@@ -132,6 +132,19 @@ public class SemanticRule
             }
         }
         return words;
+    }
+
+    private static boolean matchesAlias(String normalizedQuery, String normalizedAlias)
+    {
+        if (normalizedAlias == null || normalizedAlias.isEmpty())
+        {
+            return false;
+        }
+        if (!normalizedAlias.contains(" ") && GENERIC_CATEGORY_WORDS.contains(normalizedAlias))
+        {
+            return normalizedQuery.equals(normalizedAlias);
+        }
+        return containsPhrase(normalizedQuery, normalizedAlias);
     }
 
     private static boolean containsPhrase(String normalizedText, String normalizedPhrase)

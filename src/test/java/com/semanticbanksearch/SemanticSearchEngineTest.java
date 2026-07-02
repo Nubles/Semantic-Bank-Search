@@ -672,6 +672,22 @@ public class SemanticSearchEngineTest
         assertFalse(names(results).contains("Desert amulet 2"));
     }
 
+    @Test
+    public void bareRunesQueryStillFindsMagicRunes()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(640, "Law rune", 100, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(641, "Nature rune", 100, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(642, "Rune platebody", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("runes", index);
+
+        assertEquals(2, results.size());
+        assertTrue(names(results).contains("Law rune"));
+        assertTrue(names(results).contains("Nature rune"));
+        assertFalse(names(results).contains("Rune platebody"));
+    }
+
     private static String names(List<SemanticSearchResult> results)
     {
         StringBuilder builder = new StringBuilder();

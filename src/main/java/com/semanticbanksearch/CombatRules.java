@@ -50,7 +50,7 @@ final class CombatRules
             SemanticLibrary.rule(
                 "Magic runes",
                 "Runes used to cast spells.",
-                SemanticLibrary.aliases("magic runes", "spell runes"),
+                SemanticLibrary.aliases("magic runes", "spell runes", "runes"),
                 SemanticLibrary.patterns(
                     "air rune",
                     "water rune",

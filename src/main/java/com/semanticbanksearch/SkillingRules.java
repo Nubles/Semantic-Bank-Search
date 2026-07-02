@@ -51,7 +51,7 @@ final class SkillingRules
                 "Skilling outfits",
                 "Experience and utility outfits used while skilling.",
                 SemanticLibrary.aliases("skilling outfit", "skilling outfits", "skill outfit", "xp outfit", "graceful"),
-                SemanticLibrary.patterns("graceful", "prospector", "angler hat", "angler top", "angler waders", "angler boots", "lumberjack", "farmer", "rogue", "pyromancer", "carpenter", "smiths", "goldsmith", "varrock armour", "desert amulet"),
+                SemanticLibrary.patterns("graceful", "prospector", "angler hat", "angler top", "angler waders", "angler boots", "lumberjack", "farmer", "rogue", "pyromancer", "carpenter", "smiths", "goldsmith", "varrock armour"),
                 SemanticLibrary.scores(
                     "graceful", 30,
                     "prospector", 25,

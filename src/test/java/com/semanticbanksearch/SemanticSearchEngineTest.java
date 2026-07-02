@@ -643,6 +643,35 @@ public class SemanticSearchEngineTest
         assertEquals(1, results.size());
         assertEquals("Sextant", results.get(0).getItemName());
     }
+
+    @Test
+    public void vorkathPrepDoesNotMatchVoidwaker()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(620, "Void knight top", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(621, "Voidwaker", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("vorkath gear", index);
+
+        assertEquals(1, results.size());
+        assertEquals("Void knight top", results.get(0).getItemName());
+        assertFalse(names(results).contains("Voidwaker"));
+    }
+
+    @Test
+    public void skillingOutfitDoesNotReturnDesertAmulet()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(630, "Graceful hood", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(631, "Desert amulet 2", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("skilling outfit", index);
+
+        assertEquals(1, results.size());
+        assertEquals("Graceful hood", results.get(0).getItemName());
+        assertFalse(names(results).contains("Desert amulet 2"));
+    }
+
     private static String names(List<SemanticSearchResult> results)
     {
         StringBuilder builder = new StringBuilder();

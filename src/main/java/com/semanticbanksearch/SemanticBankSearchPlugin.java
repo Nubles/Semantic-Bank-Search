@@ -40,7 +40,8 @@ public class SemanticBankSearchPlugin extends Plugin
 	private enum PanelMode
 	{
 		SEARCH,
-		ALL_INDEXED
+		ALL_INDEXED,
+		COVERAGE_AUDIT
 	}
 
 	private static class ViewState
@@ -81,6 +82,7 @@ public class SemanticBankSearchPlugin extends Plugin
 	private final Object viewStateLock = new Object();
 	private StorageIndex index;
 	private SemanticSearchEngine engine;
+	private SemanticCoverageAnalyzer coverageAnalyzer;
 	private ObservedStorageScanner storageScanner;
 	private final Set<String> visibleStorageSourceKeys = new HashSet<>();
 	private SemanticBankSearchPanel panel;
@@ -105,7 +107,9 @@ public class SemanticBankSearchPlugin extends Plugin
 		index = SemanticBankSearchStorage.deserialize(
 			gson,
 			configManager.getConfiguration(SemanticBankSearchConfig.GROUP, STORAGE_KEY));
-		engine = new SemanticSearchEngine(SemanticLibrary.create());
+		List<SemanticRule> rules = SemanticLibrary.create();
+		engine = new SemanticSearchEngine(rules);
+		coverageAnalyzer = new SemanticCoverageAnalyzer(rules);
 		storageScanner = new ObservedStorageScanner(
 			client::getItemContainer,
 			this::isWidgetVisible,
@@ -113,7 +117,7 @@ public class SemanticBankSearchPlugin extends Plugin
 			this::resolveItemName);
 		overlay = new SemanticBankSearchOverlay(config);
 		overlayManager.add(overlay);
-		panel = new SemanticBankSearchPanel(this::runSearch, this::showIndexedItems, this::clearSearch);
+		panel = new SemanticBankSearchPanel(this::runSearch, this::showIndexedItems, this::showCoverageAudit, this::clearSearch);
 		navigationButton = NavigationButton.builder()
 			.tooltip("Semantic Bank Search")
 			.icon(createIcon())
@@ -145,6 +149,7 @@ public class SemanticBankSearchPlugin extends Plugin
 		panel = null;
 		overlay = null;
 		engine = null;
+		coverageAnalyzer = null;
 		storageScanner = null;
 		visibleStorageSourceKeys.clear();
 		navigationButton = null;
@@ -216,12 +221,34 @@ public class SemanticBankSearchPlugin extends Plugin
 		refreshIndexedItems(revision);
 	}
 
+	private void showCoverageAudit()
+	{
+		long revision = setViewState(PanelMode.COVERAGE_AUDIT, "");
+		synchronized (viewStateLock)
+		{
+			if (!isCurrentViewRevision(revision))
+			{
+				return;
+			}
+			if (overlay != null)
+			{
+				overlay.setHighlightedItemIds(new ArrayList<>());
+			}
+		}
+		refreshCoverageAudit(revision);
+	}
+
 	private void refreshActivePanelMode()
 	{
 		ViewState viewState = snapshotViewState();
 		if (viewState.panelMode == PanelMode.ALL_INDEXED)
 		{
 			refreshIndexedItems(viewState.revision);
+			return;
+		}
+		if (viewState.panelMode == PanelMode.COVERAGE_AUDIT)
+		{
+			refreshCoverageAudit(viewState.revision);
 			return;
 		}
 
@@ -247,6 +274,24 @@ public class SemanticBankSearchPlugin extends Plugin
 				return;
 			}
 			panel.updateIndexedItems(items, indexedStatus(items));
+		}
+	}
+
+	private void refreshCoverageAudit(long revision)
+	{
+		if (panel == null || coverageAnalyzer == null || index == null)
+		{
+			return;
+		}
+
+		List<SemanticCoverageResult> results = coverageAnalyzer.analyze(index.items());
+		synchronized (viewStateLock)
+		{
+			if (!isCurrentViewRevision(revision))
+			{
+				return;
+			}
+			panel.updateCoverageAudit(results, coverageStatus(results));
 		}
 	}
 
@@ -375,6 +420,28 @@ public class SemanticBankSearchPlugin extends Plugin
 		this.lastPersistMillis = lastPersistMillis;
 	}
 
+	void setSearchComponentsForTesting(
+		StorageIndex index,
+		SemanticCoverageAnalyzer coverageAnalyzer,
+		SemanticBankSearchPanel panel,
+		SemanticBankSearchOverlay overlay)
+	{
+		this.index = index;
+		this.coverageAnalyzer = coverageAnalyzer;
+		this.panel = panel;
+		this.overlay = overlay;
+	}
+
+	void showCoverageAuditForTesting()
+	{
+		showCoverageAudit();
+	}
+
+	String coverageStatusForTesting(List<SemanticCoverageResult> results)
+	{
+		return coverageStatus(results);
+	}
+
 	private boolean observeSafeStorage(long now)
 	{
 		if (index == null || storageScanner == null || !config.rememberObservedStorage())
@@ -498,6 +565,24 @@ public class SemanticBankSearchPlugin extends Plugin
 			return "Open the bank to refresh visible item status.";
 		}
 		return "Showing " + items.size() + " observed items.";
+	}
+
+	private String coverageStatus(List<SemanticCoverageResult> results)
+	{
+		if (results == null || results.isEmpty())
+		{
+			return "";
+		}
+
+		int covered = 0;
+		for (SemanticCoverageResult result : results)
+		{
+			if (result.isCovered())
+			{
+				covered++;
+			}
+		}
+		return "Covered " + covered + " of " + results.size() + " observed items.";
 	}
 
 	private String statusText(List<SemanticSearchResult> results)

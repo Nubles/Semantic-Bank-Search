@@ -33,6 +33,14 @@ Covered rows show the matched categories and reasons. Uncovered rows are the bes
 
 The audit view is passive. It does not highlight bank items, infer unobserved storage, or change item/menu behavior.
 
+## Coverage Benchmarks
+
+Coverage benchmarks live in `src/test/java/com/semanticbanksearch/SemanticCoverageBenchmarkTest.java`.
+
+They use small fixture banks that look like real account tabs: midgame utility, ironman skilling, PvM/slayer, and clue utility. Each fixture protects a minimum coverage count and a few intentionally uncovered items. Some useful uncovered items are kept explicit so future category work has a concrete target list.
+
+Use benchmark failures as a triage list. If a useful item appears uncovered, add a player query, expected positives, and expected negatives before widening rules. If an intentionally uncovered item starts matching, check for a broad pattern that may be causing category bleed.
+
 ## Writing Query Pack Cases
 
 Curated query-pack cases live in `src/test/java/com/semanticbanksearch/CuratedQueryPackTest.java`.

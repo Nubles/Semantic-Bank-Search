@@ -98,7 +98,7 @@ final class BossRules
             SemanticLibrary.rule(
                 "Crypt prep",
                 "Useful for Barrows trips: prayer, magic gear, spade, and nearby teleports.",
-                SemanticLibrary.aliases("barrows gear", "barrows prep", "barrows setup", "barrows supplies"),
+                SemanticLibrary.aliases("barrows gear", "barrows prep", "barrows setup", "barrows supplies", "barrows trip"),
                 SemanticLibrary.patterns(
                     "spade",
                     "prayer potion",

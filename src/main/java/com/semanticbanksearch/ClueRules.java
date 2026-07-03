@@ -15,7 +15,7 @@ final class ClueRules
             SemanticLibrary.rule(
                 "Clue utility",
                 "Useful for clue stashes and clue steps.",
-                SemanticLibrary.aliases("clue stash", "clue stashes", "stash", "items used for clue stashes", "clue tools", "dig clue", "emote clue", "clue supplies"),
+                SemanticLibrary.aliases("clue stash", "clue stashes", "stash", "items used for clue stashes", "clue tools", "clue step", "clue steps", "dig clue", "emote clue", "clue supplies"),
                 SemanticLibrary.patterns("saw", "hammer", "nails", "plank", "clue hunter", "spade", "rope", "sextant", "watch", "chart", "bullseye lantern", "light source", "lantern", "fairy ring", "teleport scroll", "teleport tablet", "amulet of glory", "games necklace", "ring of dueling", "stamina potion", "energy potion"),
                 SemanticLibrary.scores(),
                 100),

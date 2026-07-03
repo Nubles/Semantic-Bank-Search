@@ -1205,6 +1205,40 @@ public class SemanticSearchEngineTest
         assertFalse(names(results).contains("Barrows teleport"));
     }
 
+    @Test
+    public void accessToolsFindsTraversalItemsWithoutBattleaxeBleed()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(990, "Rope", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(991, "Lockpick", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(992, "Machete", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(993, "Dragon battleaxe", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("access tools", index);
+
+        assertTrue(names(results).contains("Rope"));
+        assertTrue(names(results).contains("Lockpick"));
+        assertTrue(names(results).contains("Machete"));
+        assertFalse(names(results).contains("Dragon battleaxe"));
+    }
+
+    @Test
+    public void dragonfireProtectionFindsDragonfireItemsWithoutGenericShields()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(994, "Anti-dragon shield", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(995, "Extended antifire(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(996, "Super antifire(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(997, "Rune kiteshield", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("dragonfire protection", index);
+
+        assertTrue(names(results).contains("Anti-dragon shield"));
+        assertTrue(names(results).contains("Extended antifire(4)"));
+        assertTrue(names(results).contains("Super antifire(4)"));
+        assertFalse(names(results).contains("Rune kiteshield"));
+    }
+
     private static String names(List<SemanticSearchResult> results)
     {
         StringBuilder builder = new StringBuilder();

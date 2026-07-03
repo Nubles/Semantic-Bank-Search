@@ -61,13 +61,12 @@ final class ToolRules
                 "Traversal tools",
                 "Common tools used to unlock paths, cross obstacles, or access quest areas.",
                 SemanticLibrary.aliases("access tools", "quest access tools", "dungeon tools", "lockpick tools", "machete tools"),
-                SemanticLibrary.patterns("rope", "lockpick", "machete", "knife", "hammer", "saw", "pickaxe", "axe"),
+                SemanticLibrary.patterns("rope", "lockpick", "machete", "knife", "hammer", "saw", "pickaxe"),
                 SemanticLibrary.scores(
                     "rope", 25,
                     "lockpick", 25,
                     "machete", 20,
-                    "pickaxe", 15,
-                    "axe", 15),
+                    "pickaxe", 15),
                 105));
     }
 }

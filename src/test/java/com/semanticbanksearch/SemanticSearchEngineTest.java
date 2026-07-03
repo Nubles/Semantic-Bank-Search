@@ -1139,6 +1139,72 @@ public class SemanticSearchEngineTest
         assertFalse(names(results).contains("Shantay pass"));
     }
 
+    @Test
+    public void lightSourceFindsLanternsAndTorches()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(950, "Bullseye lantern", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(951, "Bruma torch", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(952, "Rune sword", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("light source", index);
+
+        assertTrue(names(results).contains("Bullseye lantern"));
+        assertTrue(names(results).contains("Bruma torch"));
+        assertFalse(names(results).contains("Rune sword"));
+    }
+
+    @Test
+    public void ghostspeakFindsGhostspeakItems()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(960, "Ghostspeak amulet", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(961, "Cramulet", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(962, "Amulet of strength", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("ghostspeak", index);
+
+        assertTrue(names(results).contains("Ghostspeak amulet"));
+        assertTrue(names(results).contains("Cramulet"));
+        assertFalse(names(results).contains("Amulet of strength"));
+    }
+
+    @Test
+    public void digClueItemsFindsSpadeAndNavigationTools()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(970, "Spade", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(971, "Sextant", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(972, "Watch", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(973, "Chart", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(974, "Dragon scimitar", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("dig clue items", index);
+
+        assertTrue(names(results).contains("Spade"));
+        assertTrue(names(results).contains("Sextant"));
+        assertTrue(names(results).contains("Watch"));
+        assertTrue(names(results).contains("Chart"));
+        assertFalse(names(results).contains("Dragon scimitar"));
+    }
+
+    @Test
+    public void desertProtectionFindsWaterskinsAndPasses()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(980, "Waterskin(4)", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(981, "Shantay pass", 5, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(982, "Desert amulet 4", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(983, "Barrows teleport", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("desert protection", index);
+
+        assertTrue(names(results).contains("Waterskin(4)"));
+        assertTrue(names(results).contains("Shantay pass"));
+        assertTrue(names(results).contains("Desert amulet 4"));
+        assertFalse(names(results).contains("Barrows teleport"));
+    }
+
     private static String names(List<SemanticSearchResult> results)
     {
         StringBuilder builder = new StringBuilder();

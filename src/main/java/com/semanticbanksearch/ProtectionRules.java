@@ -27,10 +27,21 @@ final class ProtectionRules
                 SemanticLibrary.scores(),
                 100),
             SemanticLibrary.rule(
+                "Dragonfire safeguards",
+                "Items and consumables used for dragonfire protection.",
+                SemanticLibrary.aliases("anti dragon", "anti-dragon", "dragonfire protection", "dragon shield", "anti dragon shield"),
+                SemanticLibrary.patterns("anti-dragon shield", "dragonfire shield", "dragonfire ward", "extended antifire", "antifire potion", "super antifire"),
+                SemanticLibrary.scores(
+                    "anti-dragon shield", 35,
+                    "dragonfire shield", 30,
+                    "extended antifire", 25,
+                    "super antifire", 25),
+                115),
+            SemanticLibrary.rule(
                 "Desert protection",
                 "Protects against desert heat and supports desert travel.",
-                SemanticLibrary.aliases("desert protection", "desert survival", "heat protection"),
-                SemanticLibrary.patterns("waterskin", "desert robes", "desert shirt", "desert boots", "desert amulet", "circlet of water", "water tiara", "shantay pass"),
+                SemanticLibrary.aliases("desert protection", "desert survival", "heat protection", "desert gear", "desert utility"),
+                SemanticLibrary.patterns("waterskin", "desert robes", "desert shirt", "desert boots", "desert amulet", "camulet", "circlet of water", "water tiara", "shantay pass"),
                 SemanticLibrary.scores(
                     "waterskin", 30,
                     "circlet of water", 30,

@@ -29,6 +29,17 @@ final class ClueRules
                     "watch", 30,
                     "chart", 30,
                     "spade", 15),
-                110));
+                110),
+            SemanticLibrary.rule(
+                "Dig clue",
+                "Items used for dig and coordinate clue steps.",
+                SemanticLibrary.aliases("dig clue items", "dig clue tools", "dig clue", "coordinate dig clue"),
+                SemanticLibrary.patterns("spade", "sextant", "watch", "chart", "bullseye lantern", "lantern", "rope"),
+                SemanticLibrary.scores(
+                    "spade", 30,
+                    "sextant", 25,
+                    "watch", 25,
+                    "chart", 25),
+                115));
     }
 }

@@ -25,6 +25,14 @@ The database should never require external AI, network calls, downloaded data, a
 
 Prefer one narrow improvement over a broad rule that looks useful but catches unrelated items.
 
+## Coverage Audit View
+
+Use the plugin's `Coverage` view before expanding a category. It shows every observed item that currently has semantic coverage and every observed item that is still uncovered.
+
+Covered rows show the matched categories and reasons. Uncovered rows are the best source of future coverage work, because they come from real observed bank/storage contents instead of guesses.
+
+The audit view is passive. It does not highlight bank items, infer unobserved storage, or change item/menu behavior.
+
 ## Writing Query Pack Cases
 
 Curated query-pack cases live in `src/test/java/com/semanticbanksearch/CuratedQueryPackTest.java`.

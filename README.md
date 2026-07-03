@@ -17,6 +17,7 @@ Example searches:
 
 - **Search** finds observed owned items by purpose or item-name fallback.
 - **All Indexed** lists every item the plugin has observed locally, so players can check what the plugin currently knows about their bank/storage.
+- **Coverage** audits observed items and shows which ones already have semantic categories versus items that still need coverage.
 
 The bundled semantic database is local static data. It covers common teleports, potions, food, combat equipment, boss prep, slayer prep, tools, skilling supplies, skilling workflows, minigame prep, clue utility, quest/diary utility, travel, and protection items. The static semantic pack also covers regional travel and utility searches such as Kourend/Zeah travel, Fossil Island travel, fairy ring access, Fremennik travel, light sources, ghostspeak items, dig clue tools, and desert protection. It is intentionally approximate and avoids runtime network calls.
 

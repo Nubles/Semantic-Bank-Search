@@ -22,6 +22,8 @@ The bundled semantic database is local static data. It covers common teleports, 
 
 See [Semantic Coverage Guide](docs/SEMANTIC_COVERAGE.md) for how to add new semantic coverage safely.
 
+See [Contributing](CONTRIBUTING.md) for development, testing, and safety expectations.
+
 The plugin is local-only. It reads visible bank items plus safe observed storage containers such as Seed Vault and Group Storage, remembers those observations locally, and highlights matching visible bank items. Remembered storage only includes items the client has observed; it cannot infer items from tabs, accounts, or storage containers that have not been opened in RuneLite. POH storage is not inferred; only explicitly safe RuneLite-exposed inventories are remembered.
 
 It does not click, withdraw, deposit, move, tag, modify menus, use external services, or send bank contents anywhere.

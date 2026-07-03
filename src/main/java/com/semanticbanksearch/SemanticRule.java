@@ -108,6 +108,15 @@ public class SemanticRule
         return false;
     }
 
+    boolean matchesObservedItem(ObservedItem item)
+    {
+        if (item == null)
+        {
+            return false;
+        }
+        return matchesItem(SemanticSearchEngine.normalize(item.getName()));
+    }
+
     public int scoreFor(String normalizedItemName)
     {
         int score = baseScore;

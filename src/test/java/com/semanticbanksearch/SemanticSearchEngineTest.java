@@ -1256,6 +1256,61 @@ public class SemanticSearchEngineTest
         assertFalse(names(results).contains("Dragon battleaxe"));
     }
 
+    @Test
+    public void travelUtilityQueriesDoNotBleedAcrossCategories()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(990, "Xeric's talisman", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(991, "Dramen staff", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(992, "Ghostspeak amulet", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(993, "Bullseye lantern", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(994, "Dragon scimitar", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> kourendResults = new SemanticSearchEngine(SemanticLibrary.create()).search("kourend teleport", index);
+        assertTrue(names(kourendResults).contains("Xeric's talisman"));
+        assertFalse(names(kourendResults).contains("Ghostspeak amulet"));
+        assertFalse(names(kourendResults).contains("Bullseye lantern"));
+
+        List<SemanticSearchResult> fairyRingResults = new SemanticSearchEngine(SemanticLibrary.create()).search("fairy ring items", index);
+        assertTrue(names(fairyRingResults).contains("Dramen staff"));
+        assertFalse(names(fairyRingResults).contains("Xeric's talisman"));
+        assertFalse(names(fairyRingResults).contains("Dragon scimitar"));
+
+        List<SemanticSearchResult> ghostspeakResults = new SemanticSearchEngine(SemanticLibrary.create()).search("ghostspeak", index);
+        assertTrue(names(ghostspeakResults).contains("Ghostspeak amulet"));
+        assertFalse(names(ghostspeakResults).contains("Dramen staff"));
+    }
+
+    @Test
+    public void genericTravelWordDoesNotActivateEveryRegionalRule()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(995, "Xeric's talisman", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(996, "Digsite pendant", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(997, "Enchanted lyre", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("travel", index);
+
+        assertTrue(results.isEmpty());
+    }
+
+    @Test
+    public void ardougneTravelFindsKandarinItemsOnly()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(1002, "Ardougne cloak", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(1003, "Camelot teleport", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(1004, "Xeric's talisman", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(1005, "Enchanted lyre", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("ardougne travel", index);
+
+        assertTrue(names(results).contains("Ardougne cloak"));
+        assertTrue(names(results).contains("Camelot teleport"));
+        assertFalse(names(results).contains("Xeric's talisman"));
+        assertFalse(names(results).contains("Enchanted lyre"));
+    }
+
     private static String names(List<SemanticSearchResult> results)
     {
         StringBuilder builder = new StringBuilder();

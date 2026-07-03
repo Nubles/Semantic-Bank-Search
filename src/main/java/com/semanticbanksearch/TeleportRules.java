@@ -69,7 +69,7 @@ final class TeleportRules
                     "numulite", 10),
                 115),
             SemanticLibrary.rule(
-                "Fairy rings",
+                "Fairy network",
                 "Items used to access fairy rings.",
                 SemanticLibrary.aliases("fairy ring", "fairy rings", "fairy ring items", "fairy ring access"),
                 SemanticLibrary.patterns("dramen staff", "lunar staff", "quest cape"),

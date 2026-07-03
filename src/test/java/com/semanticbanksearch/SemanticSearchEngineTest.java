@@ -1093,12 +1093,27 @@ public class SemanticSearchEngineTest
     }
 
     @Test
+    public void ringItemSearchDoesNotActivateFairyNetwork()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(934, "Ring of dueling(8)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(935, "Dramen staff", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("ring of dueling", index);
+
+        assertEquals(1, results.size());
+        assertEquals("Ring of dueling(8)", results.get(0).getItemName());
+        assertEquals("Item name match", results.get(0).getCategory());
+        assertFalse(names(results).contains("Dramen staff"));
+    }
+
+    @Test
     public void wildyTeleportFindsWildernessEscapeItems()
     {
         StorageIndex index = new StorageIndex();
-        index.record(934, "Royal seed pod", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
-        index.record(935, "Wilderness sword 4", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
-        index.record(936, "Shantay pass", 5, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(936, "Royal seed pod", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(937, "Wilderness sword 4", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(938, "Shantay pass", 5, StorageSourceType.BANK, "Bank", true, 1_000L);
 
         List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("wildy teleport", index);
 

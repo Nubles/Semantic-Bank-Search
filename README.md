@@ -20,6 +20,8 @@ Example searches:
 
 The bundled semantic database is local static data. It covers common teleports, potions, food, combat equipment, boss prep, slayer prep, tools, skilling supplies, skilling workflows, minigame prep, clue utility, quest/diary utility, travel, and protection items. The static semantic pack also covers regional travel and utility searches such as Kourend/Zeah travel, Fossil Island travel, fairy ring access, Fremennik travel, light sources, ghostspeak items, dig clue tools, and desert protection. It is intentionally approximate and avoids runtime network calls.
 
+See [Semantic Coverage Guide](docs/SEMANTIC_COVERAGE.md) for how to add new semantic coverage safely.
+
 The plugin is local-only. It reads visible bank items plus safe observed storage containers such as Seed Vault and Group Storage, remembers those observations locally, and highlights matching visible bank items. Remembered storage only includes items the client has observed; it cannot infer items from tabs, accounts, or storage containers that have not been opened in RuneLite. POH storage is not inferred; only explicitly safe RuneLite-exposed inventories are remembered.
 
 It does not click, withdraw, deposit, move, tag, modify menus, use external services, or send bank contents anywhere.

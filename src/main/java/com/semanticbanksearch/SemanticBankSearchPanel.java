@@ -34,6 +34,7 @@ public class SemanticBankSearchPanel extends PluginPanel
 
 	private final Consumer<String> searchConsumer;
 	private final Runnable allIndexedConsumer;
+	private final Runnable coverageAuditConsumer;
 	private final Runnable clearConsumer;
 	private final JPanel resultsContainer = new JPanel();
 	private final JLabel statusLabel = new JLabel(" ");
@@ -42,9 +43,19 @@ public class SemanticBankSearchPanel extends PluginPanel
 
 	public SemanticBankSearchPanel(Consumer<String> searchConsumer, Runnable allIndexedConsumer, Runnable clearConsumer)
 	{
+		this(searchConsumer, allIndexedConsumer, null, clearConsumer);
+	}
+
+	public SemanticBankSearchPanel(
+		Consumer<String> searchConsumer,
+		Runnable allIndexedConsumer,
+		Runnable coverageAuditConsumer,
+		Runnable clearConsumer)
+	{
 		super();
 		this.searchConsumer = searchConsumer == null ? ignored -> { } : searchConsumer;
 		this.allIndexedConsumer = allIndexedConsumer == null ? () -> { } : allIndexedConsumer;
+		this.coverageAuditConsumer = coverageAuditConsumer == null ? () -> { } : coverageAuditConsumer;
 		this.clearConsumer = clearConsumer == null ? () -> { } : clearConsumer;
 
 		setLayout(new BorderLayout(0, 8));
@@ -88,6 +99,20 @@ public class SemanticBankSearchPanel extends PluginPanel
 		}
 
 		renderIndexedItems(sequence, safeItems, safeStatus);
+	}
+
+	public void updateCoverageAudit(List<SemanticCoverageResult> results, String status)
+	{
+		int sequence = nextRenderSequence();
+		List<SemanticCoverageResult> safeResults = results == null ? Collections.emptyList() : new ArrayList<>(results);
+		String safeStatus = status == null ? "" : status;
+		if (!SwingUtilities.isEventDispatchThread())
+		{
+			SwingUtilities.invokeLater(() -> renderCoverageAudit(sequence, safeResults, safeStatus));
+			return;
+		}
+
+		renderCoverageAudit(sequence, safeResults, safeStatus);
 	}
 
 	public void clearResults()
@@ -158,6 +183,34 @@ public class SemanticBankSearchPanel extends PluginPanel
 		repaint();
 	}
 
+	private void renderCoverageAudit(int sequence, List<SemanticCoverageResult> results, String status)
+	{
+		if (!isLatestRenderSequence(sequence))
+		{
+			return;
+		}
+
+		resultsContainer.removeAll();
+		statusLabel.setText(status.trim().isEmpty() ? "" : status.trim());
+
+		if (results.isEmpty())
+		{
+			resultsContainer.add(textBlock(
+				"No indexed items yet",
+				"Open your bank so Semantic Bank Search can audit observed item coverage."));
+		}
+		else
+		{
+			for (SemanticCoverageResult result : results)
+			{
+				resultsContainer.add(coverageCard(result));
+			}
+		}
+
+		revalidate();
+		repaint();
+	}
+
 	private void renderClearResults(int sequence)
 	{
 		if (!isLatestRenderSequence(sequence))
@@ -211,6 +264,11 @@ public class SemanticBankSearchPanel extends PluginPanel
 		allIndexedButton.setFocusable(false);
 		allIndexedButton.addActionListener(event -> allIndexedConsumer.run());
 		buttons.add(allIndexedButton);
+
+		JButton coverageButton = new JButton("Coverage");
+		coverageButton.setFocusable(false);
+		coverageButton.addActionListener(event -> coverageAuditConsumer.run());
+		buttons.add(coverageButton);
 
 		JButton clearButton = new JButton("Clear");
 		clearButton.setFocusable(false);
@@ -308,6 +366,35 @@ public class SemanticBankSearchPanel extends PluginPanel
 		return panel;
 	}
 
+	private static JPanel coverageCard(SemanticCoverageResult result)
+	{
+		JPanel panel = new JPanel(new BorderLayout(0, 6));
+		panel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		panel.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createMatteBorder(0, 0, 1, 0, ColorScheme.DARK_GRAY_COLOR),
+			BorderFactory.createEmptyBorder(8, 8, 8, 8)));
+
+		JLabel title = new JLabel(result.getItemName());
+		title.setForeground(Color.WHITE);
+		title.setFont(title.getFont().deriveFont(Font.BOLD));
+		panel.add(title, BorderLayout.NORTH);
+
+		JPanel body = new JPanel();
+		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+		body.setOpaque(false);
+		body.add(detailLabel(coverageDetails(result)));
+		if (result.isCovered())
+		{
+			body.add(wrappedText(joinLimited(result.getReasons(), 2)));
+		}
+		else
+		{
+			body.add(wrappedText("No semantic category yet."));
+		}
+		panel.add(body, BorderLayout.CENTER);
+		return panel;
+	}
+
 	private static JPanel textBlock(String title, String body)
 	{
 		JPanel panel = new JPanel(new BorderLayout(0, 6));
@@ -364,5 +451,56 @@ public class SemanticBankSearchPanel extends PluginPanel
 		return "Source " + source
 			+ " | Quantity " + item.getQuantity()
 			+ " | " + highlightState;
+	}
+
+	private static String coverageDetails(SemanticCoverageResult result)
+	{
+		String source = result.getSourceName().isEmpty()
+			? result.getSourceType().name()
+			: result.getSourceName();
+		String highlightState = result.isCurrentlyVisible() && result.getSourceType() == StorageSourceType.BANK
+			? "visible in bank"
+			: "remembered";
+		String coverage = result.isCovered()
+			? " | Categories " + joinLimited(result.getCategories(), 3)
+			: " | Uncovered";
+		return "Source " + source
+			+ " | Quantity " + result.getQuantity()
+			+ " | " + highlightState
+			+ coverage;
+	}
+
+	private static String joinLimited(List<String> values, int limit)
+	{
+		if (values == null || values.isEmpty() || limit <= 0)
+		{
+			return "";
+		}
+
+		List<String> joinedValues = new ArrayList<>();
+		int remaining = 0;
+		for (String value : values)
+		{
+			if (value == null || value.trim().isEmpty())
+			{
+				continue;
+			}
+
+			if (joinedValues.size() < limit)
+			{
+				joinedValues.add(value.trim());
+			}
+			else
+			{
+				remaining++;
+			}
+		}
+
+		String joined = String.join(", ", joinedValues);
+		if (remaining > 0)
+		{
+			return joined + ", +" + remaining + " more";
+		}
+		return joined;
 	}
 }

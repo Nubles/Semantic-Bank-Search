@@ -1239,6 +1239,23 @@ public class SemanticSearchEngineTest
         assertFalse(names(results).contains("Rune kiteshield"));
     }
 
+    @Test
+    public void questToolsFindsUtilityItemsWithoutBattleaxeBleed()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(998, "Rope", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(999, "Spade", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(1000, "Pickaxe", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(1001, "Dragon battleaxe", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("quest tools", index);
+
+        assertTrue(names(results).contains("Rope"));
+        assertTrue(names(results).contains("Spade"));
+        assertTrue(names(results).contains("Pickaxe"));
+        assertFalse(names(results).contains("Dragon battleaxe"));
+    }
+
     private static String names(List<SemanticSearchResult> results)
     {
         StringBuilder builder = new StringBuilder();

@@ -43,7 +43,7 @@ final class ToolRules
                 "Quest utility",
                 "Common tools used by quests and achievement diaries.",
                 SemanticLibrary.aliases("quest tools", "quest utility", "diary tools", "achievement diary tools"),
-                SemanticLibrary.patterns("ghostspeak amulet", "rope", "spade", "pickaxe", "axe", "knife", "bucket", "empty pot", "pestle and mortar", "vial", "needle", "thread", "hammer", "chisel", "light source", "lantern", "tinderbox"),
+                SemanticLibrary.patterns("ghostspeak amulet", "rope", "spade", "pickaxe", "knife", "bucket", "empty pot", "pestle and mortar", "vial", "needle", "thread", "hammer", "chisel", "light source", "lantern", "tinderbox"),
                 SemanticLibrary.scores(
                     "ghostspeak amulet", 30,
                     "rope", 20,

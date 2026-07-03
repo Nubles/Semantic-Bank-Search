@@ -35,6 +35,7 @@ public class SemanticBankSearchPanel extends PluginPanel
 	private final Consumer<String> searchConsumer;
 	private final Runnable allIndexedConsumer;
 	private final Runnable coverageAuditConsumer;
+	private final boolean coverageAuditAvailable;
 	private final Runnable clearConsumer;
 	private final JPanel resultsContainer = new JPanel();
 	private final JLabel statusLabel = new JLabel(" ");
@@ -55,6 +56,7 @@ public class SemanticBankSearchPanel extends PluginPanel
 		super();
 		this.searchConsumer = searchConsumer == null ? ignored -> { } : searchConsumer;
 		this.allIndexedConsumer = allIndexedConsumer == null ? () -> { } : allIndexedConsumer;
+		this.coverageAuditAvailable = coverageAuditConsumer != null;
 		this.coverageAuditConsumer = coverageAuditConsumer == null ? () -> { } : coverageAuditConsumer;
 		this.clearConsumer = clearConsumer == null ? () -> { } : clearConsumer;
 
@@ -265,10 +267,13 @@ public class SemanticBankSearchPanel extends PluginPanel
 		allIndexedButton.addActionListener(event -> allIndexedConsumer.run());
 		buttons.add(allIndexedButton);
 
-		JButton coverageButton = new JButton("Coverage");
-		coverageButton.setFocusable(false);
-		coverageButton.addActionListener(event -> coverageAuditConsumer.run());
-		buttons.add(coverageButton);
+		if (coverageAuditAvailable)
+		{
+			JButton coverageButton = new JButton("Coverage");
+			coverageButton.setFocusable(false);
+			coverageButton.addActionListener(event -> coverageAuditConsumer.run());
+			buttons.add(coverageButton);
+		}
 
 		JButton clearButton = new JButton("Clear");
 		clearButton.setFocusable(false);
@@ -383,13 +388,16 @@ public class SemanticBankSearchPanel extends PluginPanel
 		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
 		body.setOpaque(false);
 		body.add(detailLabel(coverageDetails(result)));
-		if (result.isCovered())
+
+		String categories = joinLimited(result.getCategories(), 3);
+		if (categories.isEmpty())
 		{
-			body.add(wrappedText(joinLimited(result.getReasons(), 2)));
+			body.add(wrappedText("No semantic category yet."));
 		}
 		else
 		{
-			body.add(wrappedText("No semantic category yet."));
+			String reasons = joinLimited(result.getReasons(), 2);
+			body.add(wrappedText(reasons.isEmpty() ? "Matched by semantic coverage rules." : reasons));
 		}
 		panel.add(body, BorderLayout.CENTER);
 		return panel;
@@ -461,9 +469,10 @@ public class SemanticBankSearchPanel extends PluginPanel
 		String highlightState = result.isCurrentlyVisible() && result.getSourceType() == StorageSourceType.BANK
 			? "visible in bank"
 			: "remembered";
-		String coverage = result.isCovered()
-			? " | Categories " + joinLimited(result.getCategories(), 3)
-			: " | Uncovered";
+		String categories = joinLimited(result.getCategories(), 3);
+		String coverage = categories.isEmpty()
+			? " | Uncovered"
+			: " | Categories " + categories;
 		return "Source " + source
 			+ " | Quantity " + result.getQuantity()
 			+ " | " + highlightState

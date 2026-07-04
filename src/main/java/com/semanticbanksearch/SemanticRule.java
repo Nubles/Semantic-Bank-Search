@@ -176,16 +176,7 @@ public class SemanticRule
         {
             return normalizedQuery.equals(normalizedAlias);
         }
-        return containsPhrase(normalizedQuery, normalizedAlias);
-    }
-
-    private static boolean containsPhrase(String normalizedText, String normalizedPhrase)
-    {
-        if (normalizedPhrase == null || normalizedPhrase.isEmpty())
-        {
-            return false;
-        }
-        return (" " + normalizedText + " ").contains(" " + normalizedPhrase + " ");
+        return FuzzyMatcher.phraseMatches(normalizedQuery, normalizedAlias);
     }
 
     private static boolean containsWord(String normalizedText, String normalizedWord)

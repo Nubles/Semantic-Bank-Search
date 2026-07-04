@@ -6,9 +6,9 @@ The scorecard is not part of the RuneLite runtime UI. It is a test/reporting too
 
 ## Current Scorecard
 
-- Scenarios: 14/14 passing
-- Expected positives found: 59/59
-- Expected negatives avoided: 42/42
+- Scenarios: 16/16 passing
+- Expected positives found: 62/62
+- Expected negatives avoided: 44/44
 - Runtime network calls: none
 
 ## What It Measures
@@ -31,6 +31,7 @@ The first scorecard includes:
 - Travel: wilderness escape, desert travel, Fossil Island travel.
 - Slayer: dragon Slayer task prep.
 - Wiki-guided boss trips: Vorkath, Zulrah, Fight Caves, and Wilderness boss prep.
+- Fuzzy spelling: misspelled semantic purpose queries such as prayer restoration and Vorkath trip prep.
 
 ## How To Use It
 

@@ -127,7 +127,7 @@ public class SemanticSearchEngine
     {
         for (String itemToken : itemTokens)
         {
-            if (itemToken.equals(queryToken) || itemToken.startsWith(queryToken))
+            if (FuzzyMatcher.tokensMatch(queryToken, itemToken))
             {
                 return true;
             }

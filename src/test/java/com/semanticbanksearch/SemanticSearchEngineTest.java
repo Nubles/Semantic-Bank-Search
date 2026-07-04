@@ -108,6 +108,64 @@ public class SemanticSearchEngineTest
     }
 
     @Test
+    public void fuzzySemanticAliasMatchesCommonPurposeMisspellings()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(51, "Prayer potion(4)", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(52, "Shark", 5, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("prayr restoraton", index);
+
+        assertEquals(1, results.size());
+        assertEquals("Prayer potion(4)", results.get(0).getItemName());
+        assertEquals("Prayer restoration", results.get(0).getCategory());
+    }
+
+    @Test
+    public void fuzzySemanticAliasMatchesBossTripMisspellings()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(53, "Extended super antifire(4)", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(54, "Dragon hunter crossbow", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(55, "Dramen staff", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(SemanticLibrary.create()).search("vorkat trip", index);
+
+        assertEquals(2, results.size());
+        assertTrue(names(results).contains("Extended super antifire(4)"));
+        assertTrue(names(results).contains("Dragon hunter crossbow"));
+        assertFalse(names(results).contains("Dramen staff"));
+    }
+
+    @Test
+    public void fuzzyItemNameFallbackMatchesMisspelledOwnedItemNames()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(56, "Barrows teleport", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(57, "Varrock teleport", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(Collections.emptyList()).search("barows teleprt", index);
+
+        assertEquals(1, results.size());
+        assertEquals("Barrows teleport", results.get(0).getItemName());
+        assertEquals("Item name match", results.get(0).getCategory());
+    }
+
+    @Test
+    public void fuzzyMatchingKeepsShortRiskyWordsConservative()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(58, "Law rune", 100, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(59, "Lava rune", 100, StorageSourceType.BANK, "Bank", true, 1_000L);
+
+        List<SemanticSearchResult> results = new SemanticSearchEngine(Collections.emptyList()).search("lav rune", index);
+
+        assertEquals(1, results.size());
+        assertEquals("Lava rune", results.get(0).getItemName());
+        assertFalse(names(results).contains("Law rune"));
+    }
+
+    @Test
     public void itemMatchingMultipleSemanticRulesAppearsOnce()
     {
         StorageIndex index = new StorageIndex();

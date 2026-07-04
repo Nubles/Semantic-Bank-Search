@@ -82,7 +82,17 @@ final class SemanticQueryCases
                 "Wiki-guided boss trips",
                 "wildy boss trip",
                 positives("Royal seed pod", "Burning amulet", "Blighted super restore(4)", "Blighted manta ray", "Ring of dueling(8)", "Escape crystal"),
-                negatives("Xeric's talisman", "Barrows teleport", "Dragon scimitar"))));
+                negatives("Xeric's talisman", "Barrows teleport", "Dragon scimitar")),
+            SemanticQueryCase.of(
+                "Fuzzy spelling",
+                "prayr restoraton",
+                positives("Prayer potion(4)"),
+                negatives("Shark")),
+            SemanticQueryCase.of(
+                "Fuzzy spelling",
+                "vorkat trip",
+                positives("Extended super antifire(4)", "Dragon hunter crossbow"),
+                negatives("Dramen staff"))));
     }
 
     private static List<String> positives(String... itemNames)

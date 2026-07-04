@@ -17,6 +17,8 @@ Semantic Bank Search is local-only and passive. It searches items the client has
 - vorkath trip
 - zulrah trip
 - wildy escape
+- prayr restoraton
+- barows teleprt
 
 ## Views
 
@@ -26,6 +28,8 @@ Semantic Bank Search is local-only and passive. It searches items the client has
 - **Clear** resets the current panel results and bank highlights.
 
 Result summaries show match counts, observed item counts, or semantic coverage totals so players can quickly tell what the plugin found.
+
+Search is typo-tolerant for common misspellings. Fuzzy matching is conservative: it helps with longer misspelled purpose words and item names, while short risky words such as `axe`, `bar`, `bow`, `law`, and `ring` stay mostly exact to avoid noisy results.
 
 ## Semantic Coverage
 

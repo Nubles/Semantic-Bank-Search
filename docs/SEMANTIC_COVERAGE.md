@@ -81,6 +81,17 @@ assertQueryPack(
 
 Positive examples define the user promise. Negative examples protect that promise from broad matching drift.
 
+## Fuzzy Search
+
+Search tolerates common spelling issues in two conservative places: semantic query aliases and item-name fallback. It does not fuzzy-match every item pattern inside every semantic rule.
+
+Fuzzy matching should remain cautious:
+
+- Short tokens should stay exact or prefix-based.
+- Medium and long tokens may allow small edit-distance mistakes.
+- Abbreviations such as `ppot`, `dhcb`, `dwh`, and `bgs` should be handled as aliases, not guessed through fuzzy distance.
+- Add expected negatives for risky near-matches before widening fuzzy behavior.
+
 ## Adding Rule Aliases
 
 Aliases should sound like things a player would type.

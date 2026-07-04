@@ -46,6 +46,11 @@ Covered rows show the matched categories and reasons. Uncovered rows are the bes
 
 The audit view is passive. It does not highlight bank items, infer unobserved storage, or change item/menu behavior.
 
+## Semantic QA Scorecard
+
+Use the developer QA scorecard when changing query behavior. It evaluates curated player-style queries against expected positives and expected negatives, then reports scenario counts, missing positives, and false positives.
+
+See [Semantic QA Scorecard](SEMANTIC_QA_SCORECARD.md) for the current scorecard snapshot and contributor workflow.
 ## Coverage Benchmarks
 
 Coverage benchmarks live in `src/test/java/com/semanticbanksearch/SemanticCoverageBenchmarkTest.java`.

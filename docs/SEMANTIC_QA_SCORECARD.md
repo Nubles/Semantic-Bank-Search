@@ -1,0 +1,62 @@
+# Semantic QA Scorecard
+
+Semantic Bank Search uses a developer-only QA scorecard to keep semantic search quality measurable as the static rule database grows.
+
+The scorecard is not part of the RuneLite runtime UI. It is a test/reporting tool for contributors, and it keeps the plugin's runtime promise intact: local-only, passive, and based on bundled static rules.
+
+## Current Scorecard
+
+- Scenarios: 14/14 passing
+- Expected positives found: 59/59
+- Expected negatives avoided: 42/42
+- Runtime network calls: none
+
+## What It Measures
+
+Each scorecard case contains:
+
+- A player-style query, such as `vorkath trip` or `herb run`.
+- Expected positives that should appear in results.
+- Expected negatives that should not appear in results.
+- A scenario label for grouping related query coverage.
+
+The scorecard fails when a useful expected item is missing or when a nearby-but-wrong item appears. False positives matter as much as missing positives because players need the search to feel predictable.
+
+## Covered Scenario Groups
+
+The first scorecard includes:
+
+- Core trips and utility: Barrows, clues, herb runs, birdhouse runs.
+- Minigames: Wintertodt and Tempoross supplies.
+- Travel: wilderness escape, desert travel, Fossil Island travel.
+- Slayer: dragon Slayer task prep.
+- Wiki-guided boss trips: Vorkath, Zulrah, Fight Caves, and Wilderness boss prep.
+
+## How To Use It
+
+Run the focused scorecard test before and after semantic rule changes:
+
+```powershell
+.\gradlew.bat test --tests com.semanticbanksearch.SemanticQaScorecardTest
+```
+
+For broader semantic changes, also run:
+
+```powershell
+.\gradlew.bat test --tests com.semanticbanksearch.CuratedQueryPackTest
+.\gradlew.bat test --tests com.semanticbanksearch.SemanticSearchEngineTest
+.\gradlew.bat test
+```
+
+## Adding New Cases
+
+Add new cases in `src/test/java/com/semanticbanksearch/SemanticQueryCases.java`.
+
+A good case should include:
+
+- One real player query.
+- Several expected positives.
+- Several expected negatives that are tempting false matches.
+- Specific item names that resemble real bank contents.
+
+Prefer adding a failing scorecard case before widening any item pattern or alias. Then make the smallest static rule change that passes the case without weakening nearby negatives.

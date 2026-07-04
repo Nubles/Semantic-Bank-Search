@@ -20,7 +20,7 @@ public class SemanticBankSearchPanelTest
     @Test
     public void panelUsesCompactModeButtonsAndSearchSummary() throws Exception
     {
-        SemanticBankSearchPanel panel = new SemanticBankSearchPanel(ignored -> { }, () -> { }, () -> { }, () -> { });
+        SemanticBankSearchPanel panel = new SemanticBankSearchPanel(ignored -> { }, () -> { }, ignored -> { }, () -> { }, () -> { });
 
         runOnEdt(() -> panel.updateResults("prayer", Arrays.asList(
             result("Prayer potion(4)", "Prayer restoration"),
@@ -29,6 +29,7 @@ public class SemanticBankSearchPanelTest
         List<String> text = visibleText(panel);
         assertTrue(text.contains("Search"));
         assertTrue(text.contains("All"));
+        assertTrue(text.contains("Readiness"));
         assertTrue(text.contains("Coverage"));
         assertTrue(text.contains("Clear"));
         assertFalse(text.contains("All Indexed"));
@@ -38,7 +39,7 @@ public class SemanticBankSearchPanelTest
     @Test
     public void coverageAuditGroupsUncoveredBeforeCoveredItems() throws Exception
     {
-        SemanticBankSearchPanel panel = new SemanticBankSearchPanel(ignored -> { }, () -> { }, () -> { }, () -> { });
+        SemanticBankSearchPanel panel = new SemanticBankSearchPanel(ignored -> { }, () -> { }, ignored -> { }, () -> { }, () -> { });
 
         runOnEdt(() -> panel.updateCoverageAudit(Arrays.asList(
             coverage("Prayer potion(4)", Collections.singletonList("Prayer restoration")),
@@ -54,6 +55,30 @@ public class SemanticBankSearchPanelTest
         assertTrue(indexOf(text, "Covered") < indexOf(text, "Prayer potion(4)"));
     }
 
+
+    @Test
+    public void readinessViewGroupsOwnedAndMissingSlots() throws Exception
+    {
+        SemanticBankSearchPanel panel = new SemanticBankSearchPanel(ignored -> { }, () -> { }, ignored -> { }, () -> { }, () -> { });
+
+        ReadinessResult result = new ReadinessResult(
+            "Barrows trip",
+            "Useful for quick Barrows runs.",
+            Arrays.asList(
+                readinessSlot("Nearby teleport", ReadinessSlotKind.REQUIRED, Collections.singletonList(result("Barrows teleport", "Crypt prep"))),
+                readinessSlot("Spade", ReadinessSlotKind.REQUIRED, Collections.emptyList())),
+            true);
+
+        runOnEdt(() -> panel.updateReadiness(result, "Readiness: 1 of 2 required slots covered."));
+
+        List<String> text = visibleText(panel);
+        assertTrue(text.contains("Readiness: Barrows trip"));
+        assertTrue(text.contains("Owned"));
+        assertTrue(text.contains("Missing"));
+        assertTrue(indexOf(text, "Owned") < indexOf(text, "Nearby teleport"));
+        assertTrue(indexOf(text, "Missing") < indexOf(text, "Spade"));
+        assertTrue(containsText(text, "Barrows teleport"));
+    }
     private static SemanticSearchResult result(String itemName, String category)
     {
         return new SemanticSearchResult(
@@ -77,6 +102,13 @@ public class SemanticBankSearchPanelTest
             categories.isEmpty() ? 0 : 100);
     }
 
+
+    private static ReadinessSlotResult readinessSlot(String slotName, ReadinessSlotKind kind, List<SemanticSearchResult> ownedItems)
+    {
+        return new ReadinessSlotResult(
+            new ReadinessSlot(slotName, kind, slotName, "Why this matters."),
+            ownedItems);
+    }
     private static void runOnEdt(Runnable runnable) throws Exception
     {
         if (SwingUtilities.isEventDispatchThread())
@@ -126,6 +158,18 @@ public class SemanticBankSearchPanelTest
         }
     }
 
+
+    private static boolean containsText(List<String> values, String expected)
+    {
+        for (String value : values)
+        {
+            if (value.contains(expected))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
     private static int indexOf(List<String> values, String expected)
     {
         int index = values.indexOf(expected);

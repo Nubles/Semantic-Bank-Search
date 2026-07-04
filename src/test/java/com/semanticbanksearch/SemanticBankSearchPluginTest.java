@@ -2,6 +2,7 @@ package com.semanticbanksearch;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -122,6 +123,30 @@ public class SemanticBankSearchPluginTest
         assertEquals(Collections.emptyList(), overlay.lastHighlightedItemIds);
     }
 
+
+    @Test
+    public void readinessHighlightsOwnedVisibleItems()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(300, "Barrows teleport", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(301, "Prayer potion(4)", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+        RecordingOverlay overlay = new RecordingOverlay(config(true));
+        overlay.setHighlightedItemIds(Collections.singletonList(999));
+        SemanticBankSearchPanel panel = new SemanticBankSearchPanel(ignored -> { }, () -> { }, ignored -> { }, () -> { }, () -> { });
+        SemanticBankSearchPlugin plugin = new SemanticBankSearchPlugin();
+        plugin.setSearchComponentsForTesting(
+            index,
+            new SemanticCoverageAnalyzer(SemanticLibrary.create()),
+            new ReadinessAnalyzer(SemanticLibrary.create(), ReadinessPackLibrary.create()),
+            panel,
+            overlay);
+
+        plugin.showReadinessForTesting("barrows trip");
+
+        assertTrue(overlay.lastHighlightedItemIds.contains(300));
+        assertTrue(overlay.lastHighlightedItemIds.contains(301));
+        assertFalse(overlay.lastHighlightedItemIds.contains(999));
+    }
     private static SemanticBankSearchPlugin pluginWith(
         StorageIndex index,
         ObservedStorageScanner scanner,

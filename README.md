@@ -24,12 +24,27 @@ Semantic Bank Search is local-only and passive. It searches items the client has
 
 - **Search** finds observed owned items by purpose or item-name fallback.
 - **All** lists every item the plugin has observed locally, so players can check what the plugin currently knows about their bank/storage.
+- **Readiness** checks a supported trip or task query and groups observed items into owned and missing preparation slots.
 - **Coverage** audits observed items and groups them into uncovered and covered semantic items.
 - **Clear** resets the current panel results and bank highlights.
 
 Result summaries show match counts, observed item counts, or semantic coverage totals so players can quickly tell what the plugin found.
 
 Search is typo-tolerant for common misspellings. Fuzzy matching is conservative: it helps with longer misspelled purpose words and item names, while short risky words such as `axe`, `bar`, `bow`, `law`, and `ring` stay mostly exact to avoid noisy results.
+
+
+## Readiness Mode
+
+Readiness mode turns a supported purpose query into a lightweight prep checklist. Instead of only listing matching items, it shows owned slots, missing slots, and the best observed substitutes for that task.
+
+Starter readiness packs include:
+
+- barrows trip
+- herb run
+- wildy escape
+- clue step
+
+Readiness uses the same observed-storage limits as search. If an item has not been observed in the bank or a safe remembered storage source, the plugin treats that slot as missing. It remains advisory only: it highlights owned visible bank items, but does not click, withdraw, deposit, or change menus.
 
 ## Semantic Coverage
 

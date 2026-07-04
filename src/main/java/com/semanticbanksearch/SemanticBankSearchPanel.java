@@ -34,6 +34,8 @@ public class SemanticBankSearchPanel extends PluginPanel
 
 	private final Consumer<String> searchConsumer;
 	private final Runnable allIndexedConsumer;
+	private final Consumer<String> readinessConsumer;
+	private final boolean readinessAvailable;
 	private final Runnable coverageAuditConsumer;
 	private final boolean coverageAuditAvailable;
 	private final Runnable clearConsumer;
@@ -45,7 +47,7 @@ public class SemanticBankSearchPanel extends PluginPanel
 
 	public SemanticBankSearchPanel(Consumer<String> searchConsumer, Runnable allIndexedConsumer, Runnable clearConsumer)
 	{
-		this(searchConsumer, allIndexedConsumer, null, clearConsumer);
+		this(searchConsumer, allIndexedConsumer, null, null, clearConsumer);
 	}
 
 	public SemanticBankSearchPanel(
@@ -54,13 +56,24 @@ public class SemanticBankSearchPanel extends PluginPanel
 		Runnable coverageAuditConsumer,
 		Runnable clearConsumer)
 	{
+		this(searchConsumer, allIndexedConsumer, null, coverageAuditConsumer, clearConsumer);
+	}
+
+	public SemanticBankSearchPanel(
+		Consumer<String> searchConsumer,
+		Runnable allIndexedConsumer,
+		Consumer<String> readinessConsumer,
+		Runnable coverageAuditConsumer,
+		Runnable clearConsumer)
+	{
 		super();
 		this.searchConsumer = searchConsumer == null ? ignored -> { } : searchConsumer;
 		this.allIndexedConsumer = allIndexedConsumer == null ? () -> { } : allIndexedConsumer;
+		this.readinessAvailable = readinessConsumer != null;
+		this.readinessConsumer = readinessConsumer == null ? ignored -> { } : readinessConsumer;
 		this.coverageAuditAvailable = coverageAuditConsumer != null;
 		this.coverageAuditConsumer = coverageAuditConsumer == null ? () -> { } : coverageAuditConsumer;
 		this.clearConsumer = clearConsumer == null ? () -> { } : clearConsumer;
-
 		setLayout(new BorderLayout(0, 8));
 		setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -127,6 +140,19 @@ public class SemanticBankSearchPanel extends PluginPanel
 		renderCoverageAudit(sequence, safeResults, safeStatus);
 	}
 
+	public void updateReadiness(ReadinessResult result, String status)
+	{
+		int sequence = nextRenderSequence();
+		ReadinessResult safeResult = result == null ? ReadinessResult.unmatched("") : result;
+		String safeStatus = status == null ? "" : status;
+		if (!SwingUtilities.isEventDispatchThread())
+		{
+			SwingUtilities.invokeLater(() -> renderReadiness(sequence, safeResult, safeStatus));
+			return;
+		}
+
+		renderReadiness(sequence, safeResult, safeStatus);
+	}
 	public void clearResults()
 	{
 		int sequence = nextRenderSequence();
@@ -249,6 +275,64 @@ public class SemanticBankSearchPanel extends PluginPanel
 		repaint();
 	}
 
+	private void renderReadiness(int sequence, ReadinessResult result, String status)
+	{
+		if (!isLatestRenderSequence(sequence))
+		{
+			return;
+		}
+
+		resultsContainer.removeAll();
+		statusLabel.setText(status.trim().isEmpty() ? " " : status.trim());
+
+		if (result == null || !result.isMatched())
+		{
+			summaryLabel.setText("Readiness: no matching pack");
+			resultsContainer.add(textBlock(
+				"No readiness pack found",
+				"Try a supported trip or task like barrows trip, herb run, wildy escape, or clue step."));
+			revalidate();
+			repaint();
+			return;
+		}
+
+		summaryLabel.setText("Readiness: " + result.getPackName());
+		if (!result.getDescription().isEmpty())
+		{
+			resultsContainer.add(textBlock(result.getPackName(), result.getDescription()));
+		}
+
+		boolean addedOwnedSection = false;
+		for (ReadinessSlotResult slotResult : result.getSlotResults())
+		{
+			if (!slotResult.isMissing())
+			{
+				if (!addedOwnedSection)
+				{
+					resultsContainer.add(sectionLabel("Owned"));
+					addedOwnedSection = true;
+				}
+				resultsContainer.add(readinessCard(slotResult));
+			}
+		}
+
+		boolean addedMissingSection = false;
+		for (ReadinessSlotResult slotResult : result.getSlotResults())
+		{
+			if (slotResult.isMissing())
+			{
+				if (!addedMissingSection)
+				{
+					resultsContainer.add(sectionLabel("Missing"));
+					addedMissingSection = true;
+				}
+				resultsContainer.add(readinessCard(slotResult));
+			}
+		}
+
+		revalidate();
+		repaint();
+	}
 	private void renderClearResults(int sequence)
 	{
 		if (!isLatestRenderSequence(sequence))
@@ -303,6 +387,14 @@ public class SemanticBankSearchPanel extends PluginPanel
 		allIndexedButton.setFocusable(false);
 		allIndexedButton.addActionListener(event -> allIndexedConsumer.run());
 		buttons.add(allIndexedButton);
+
+		if (readinessAvailable)
+		{
+			JButton readinessButton = new JButton("Readiness");
+			readinessButton.setFocusable(false);
+			readinessButton.addActionListener(event -> readinessConsumer.accept(searchField.getText().trim()));
+			buttons.add(readinessButton);
+		}
 
 		if (coverageAuditAvailable)
 		{
@@ -440,6 +532,38 @@ public class SemanticBankSearchPanel extends PluginPanel
 		return panel;
 	}
 
+	private static JPanel readinessCard(ReadinessSlotResult slotResult)
+	{
+		JPanel panel = new JPanel(new BorderLayout(0, 6));
+		panel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		panel.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createMatteBorder(0, 0, 1, 0, ColorScheme.DARK_GRAY_COLOR),
+			BorderFactory.createEmptyBorder(8, 8, 8, 8)));
+
+		JLabel title = new JLabel(slotResult.getSlotName());
+		title.setForeground(Color.WHITE);
+		title.setFont(title.getFont().deriveFont(Font.BOLD));
+		panel.add(title, BorderLayout.NORTH);
+
+		JPanel body = new JPanel();
+		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+		body.setOpaque(false);
+		body.add(detailLabel(readinessDetails(slotResult)));
+		if (!slotResult.getReason().isEmpty())
+		{
+			body.add(wrappedText(slotResult.getReason()));
+		}
+		if (slotResult.isMissing())
+		{
+			body.add(wrappedText("Not found in observed storage."));
+		}
+		else
+		{
+			body.add(wrappedText("Owned: " + readinessItems(slotResult.getOwnedItems())));
+		}
+		panel.add(body, BorderLayout.CENTER);
+		return panel;
+	}
 	private static JPanel textBlock(String title, String body)
 	{
 		JPanel panel = new JPanel(new BorderLayout(0, 6));
@@ -535,6 +659,41 @@ public class SemanticBankSearchPanel extends PluginPanel
 			+ coverage;
 	}
 
+	private static String readinessDetails(ReadinessSlotResult slotResult)
+	{
+		String state = slotResult.isMissing() ? "missing" : "owned";
+		return kindLabel(slotResult.getKind()) + " | " + state;
+	}
+
+	private static String kindLabel(ReadinessSlotKind kind)
+	{
+		if (kind == ReadinessSlotKind.REQUIRED)
+		{
+			return "Required";
+		}
+		if (kind == ReadinessSlotKind.OPTIONAL)
+		{
+			return "Optional";
+		}
+		if (kind == ReadinessSlotKind.UPGRADE)
+		{
+			return "Upgrade";
+		}
+		return "Recommended";
+	}
+
+	private static String readinessItems(List<SemanticSearchResult> items)
+	{
+		List<String> names = new ArrayList<>();
+		for (SemanticSearchResult item : items)
+		{
+			String source = item.getSourceName().isEmpty()
+				? item.getSourceType().name()
+				: item.getSourceName();
+			names.add(item.getItemName() + " x" + item.getQuantity() + " (" + source + ")");
+		}
+		return String.join(", ", names);
+	}
 	private static String joinLimited(List<String> values, int limit)
 	{
 		if (values == null || values.isEmpty() || limit <= 0)

@@ -41,6 +41,7 @@ public class SemanticBankSearchPlugin extends Plugin
 	{
 		SEARCH,
 		ALL_INDEXED,
+		READINESS,
 		COVERAGE_AUDIT
 	}
 
@@ -83,6 +84,7 @@ public class SemanticBankSearchPlugin extends Plugin
 	private StorageIndex index;
 	private SemanticSearchEngine engine;
 	private SemanticCoverageAnalyzer coverageAnalyzer;
+	private ReadinessAnalyzer readinessAnalyzer;
 	private ObservedStorageScanner storageScanner;
 	private final Set<String> visibleStorageSourceKeys = new HashSet<>();
 	private SemanticBankSearchPanel panel;
@@ -110,6 +112,7 @@ public class SemanticBankSearchPlugin extends Plugin
 		List<SemanticRule> rules = SemanticLibrary.create();
 		engine = new SemanticSearchEngine(rules);
 		coverageAnalyzer = new SemanticCoverageAnalyzer(rules);
+		readinessAnalyzer = new ReadinessAnalyzer(rules, ReadinessPackLibrary.create());
 		storageScanner = new ObservedStorageScanner(
 			client::getItemContainer,
 			this::isWidgetVisible,
@@ -117,7 +120,7 @@ public class SemanticBankSearchPlugin extends Plugin
 			this::resolveItemName);
 		overlay = new SemanticBankSearchOverlay(config);
 		overlayManager.add(overlay);
-		panel = new SemanticBankSearchPanel(this::runSearch, this::showIndexedItems, this::showCoverageAudit, this::clearSearch);
+		panel = new SemanticBankSearchPanel(this::runSearch, this::showIndexedItems, this::runReadiness, this::showCoverageAudit, this::clearSearch);
 		navigationButton = NavigationButton.builder()
 			.tooltip("Semantic Bank Search")
 			.icon(createIcon())
@@ -150,6 +153,7 @@ public class SemanticBankSearchPlugin extends Plugin
 		overlay = null;
 		engine = null;
 		coverageAnalyzer = null;
+		readinessAnalyzer = null;
 		storageScanner = null;
 		visibleStorageSourceKeys.clear();
 		navigationButton = null;
@@ -184,6 +188,18 @@ public class SemanticBankSearchPlugin extends Plugin
 		refreshCurrentSearch(cleanedQuery, revision);
 	}
 
+	private void runReadiness(String query)
+	{
+		String cleanedQuery = clean(query);
+		long revision = setViewState(PanelMode.READINESS, cleanedQuery);
+		if (cleanedQuery.isEmpty())
+		{
+			refreshReadiness(cleanedQuery, revision);
+			return;
+		}
+
+		refreshReadiness(cleanedQuery, revision);
+	}
 	private void clearSearch()
 	{
 		long revision = setViewState(PanelMode.SEARCH, "");
@@ -251,6 +267,11 @@ public class SemanticBankSearchPlugin extends Plugin
 			refreshCoverageAudit(viewState.revision);
 			return;
 		}
+		if (viewState.panelMode == PanelMode.READINESS)
+		{
+			refreshReadiness(viewState.query, viewState.revision);
+			return;
+		}
 
 		refreshCurrentSearch(viewState.query, viewState.revision);
 	}
@@ -295,6 +316,25 @@ public class SemanticBankSearchPlugin extends Plugin
 		}
 	}
 
+	private void refreshReadiness(String query, long revision)
+	{
+		if (panel == null || overlay == null || readinessAnalyzer == null || index == null)
+		{
+			return;
+		}
+
+		ReadinessResult result = readinessAnalyzer.analyze(query, index);
+		List<Integer> highlightedItemIds = readinessHighlightedItemIds(result);
+		synchronized (viewStateLock)
+		{
+			if (!isCurrentViewRevision(revision))
+			{
+				return;
+			}
+			overlay.setHighlightedItemIds(highlightedItemIds);
+			panel.updateReadiness(result, readinessStatus(result));
+		}
+	}
 	private void refreshCurrentSearch(String query, long revision)
 	{
 		if (panel == null || overlay == null || engine == null || index == null || query.isEmpty())
@@ -322,6 +362,25 @@ public class SemanticBankSearchPlugin extends Plugin
 		}
 	}
 
+	private static List<Integer> readinessHighlightedItemIds(ReadinessResult result)
+	{
+		List<Integer> highlightedItemIds = new ArrayList<>();
+		if (result == null || !result.isMatched())
+		{
+			return highlightedItemIds;
+		}
+		for (ReadinessSlotResult slotResult : result.getSlotResults())
+		{
+			for (SemanticSearchResult item : slotResult.getOwnedItems())
+			{
+				if (item.isHighlightable() && !highlightedItemIds.contains(item.getItemId()))
+				{
+					highlightedItemIds.add(item.getItemId());
+				}
+			}
+		}
+		return highlightedItemIds;
+	}
 	private long setViewState(PanelMode panelMode, String query)
 	{
 		synchronized (viewStateLock)
@@ -426,8 +485,19 @@ public class SemanticBankSearchPlugin extends Plugin
 		SemanticBankSearchPanel panel,
 		SemanticBankSearchOverlay overlay)
 	{
+		setSearchComponentsForTesting(index, coverageAnalyzer, null, panel, overlay);
+	}
+
+	void setSearchComponentsForTesting(
+		StorageIndex index,
+		SemanticCoverageAnalyzer coverageAnalyzer,
+		ReadinessAnalyzer readinessAnalyzer,
+		SemanticBankSearchPanel panel,
+		SemanticBankSearchOverlay overlay)
+	{
 		this.index = index;
 		this.coverageAnalyzer = coverageAnalyzer;
+		this.readinessAnalyzer = readinessAnalyzer;
 		this.panel = panel;
 		this.overlay = overlay;
 	}
@@ -435,6 +505,11 @@ public class SemanticBankSearchPlugin extends Plugin
 	void showCoverageAuditForTesting()
 	{
 		showCoverageAudit();
+	}
+
+	void showReadinessForTesting(String query)
+	{
+		runReadiness(query);
 	}
 
 	String coverageStatusForTesting(List<SemanticCoverageResult> results)
@@ -585,6 +660,19 @@ public class SemanticBankSearchPlugin extends Plugin
 		return "Covered " + covered + " of " + results.size() + " observed items.";
 	}
 
+	private String readinessStatus(ReadinessResult result)
+	{
+		if (result == null || !result.isMatched())
+		{
+			return "";
+		}
+		int required = result.getRequiredSlotCount();
+		if (required == 0)
+		{
+			return "Readiness: no required slots in this pack.";
+		}
+		return "Readiness: " + result.getCoveredRequiredSlotCount() + " of " + required + " required slots covered.";
+	}
 	private String statusText(List<SemanticSearchResult> results)
 	{
 		if (results == null || results.isEmpty())

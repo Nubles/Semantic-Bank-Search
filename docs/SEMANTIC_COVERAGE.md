@@ -38,6 +38,21 @@ Do not copy full guide tables into the plugin. Do not add runtime wiki/API looku
 
 Prefer one narrow improvement over a broad rule that looks useful but catches unrelated items.
 
+
+## Readiness Packs
+
+Readiness packs are curated task checklists built on top of semantic search. A pack has aliases such as `barrows trip`, then several slots such as required teleports, food, tools, or optional upgrades. Each slot runs a normal local semantic search against observed storage.
+
+Use readiness packs when a query needs a grouped answer:
+
+- What do I already own for this trip?
+- Which required slots are missing?
+- Which observed items are acceptable substitutes?
+
+Keep packs compact. They should help a player prepare from owned items, not become full activity guides. Missing slots mean "not found in observed storage," not "the account definitely does not own this item."
+
+Current starter packs cover Barrows trip, herb run, Wildy escape, and clue step readiness.
+
 ## Coverage Audit View
 
 Use the plugin's `Coverage` view before expanding a category. It shows every observed item that currently has semantic coverage and every observed item that is still uncovered.
@@ -174,6 +189,7 @@ For semantic coverage changes, run:
 ```powershell
 .\gradlew.bat test --tests com.semanticbanksearch.CuratedQueryPackTest
 .\gradlew.bat test --tests com.semanticbanksearch.SemanticSearchEngineTest
+.\gradlew.bat test --tests com.semanticbanksearch.ReadinessAnalyzerTest
 .\gradlew.bat test
 ```
 

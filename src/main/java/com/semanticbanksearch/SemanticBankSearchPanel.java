@@ -38,6 +38,7 @@ public class SemanticBankSearchPanel extends PluginPanel
 	private final boolean coverageAuditAvailable;
 	private final Runnable clearConsumer;
 	private final JPanel resultsContainer = new JPanel();
+	private final JLabel summaryLabel = new JLabel(" ");
 	private final JLabel statusLabel = new JLabel(" ");
 	private final JTextField searchField = new JTextField();
 	private int renderSequence;
@@ -68,7 +69,16 @@ public class SemanticBankSearchPanel extends PluginPanel
 		resultsContainer.setBackground(ColorScheme.DARK_GRAY_COLOR);
 
 		add(searchControls(), BorderLayout.NORTH);
-		add(new JScrollPane(resultsContainer), BorderLayout.CENTER);
+
+		summaryLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		summaryLabel.setFont(summaryLabel.getFont().deriveFont(Font.BOLD, 12f));
+		summaryLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
+
+		JPanel resultPanel = new JPanel(new BorderLayout(0, 0));
+		resultPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		resultPanel.add(summaryLabel, BorderLayout.NORTH);
+		resultPanel.add(new JScrollPane(resultsContainer), BorderLayout.CENTER);
+		add(resultPanel, BorderLayout.CENTER);
 		add(statusLabel, BorderLayout.SOUTH);
 
 		searchField.addActionListener(event -> runSearch(searchField.getText()));
@@ -137,6 +147,7 @@ public class SemanticBankSearchPanel extends PluginPanel
 		}
 
 		resultsContainer.removeAll();
+		summaryLabel.setText(matchSummary(results.size()));
 		statusLabel.setText(status.trim().isEmpty() ? " " : status.trim());
 
 		if (results.isEmpty())
@@ -165,7 +176,8 @@ public class SemanticBankSearchPanel extends PluginPanel
 		}
 
 		resultsContainer.removeAll();
-		statusLabel.setText(status.trim().isEmpty() ? "" : status.trim());
+		summaryLabel.setText(observedSummary(items.size()));
+		statusLabel.setText(status.trim().isEmpty() ? " " : status.trim());
 
 		if (items.isEmpty())
 		{
@@ -193,7 +205,8 @@ public class SemanticBankSearchPanel extends PluginPanel
 		}
 
 		resultsContainer.removeAll();
-		statusLabel.setText(status.trim().isEmpty() ? "" : status.trim());
+		summaryLabel.setText(status.trim().isEmpty() ? observedSummary(results.size()) : status.trim());
+		statusLabel.setText(" ");
 
 		if (results.isEmpty())
 		{
@@ -203,9 +216,32 @@ public class SemanticBankSearchPanel extends PluginPanel
 		}
 		else
 		{
+			boolean addedUncoveredSection = false;
 			for (SemanticCoverageResult result : results)
 			{
-				resultsContainer.add(coverageCard(result));
+				if (joinLimited(result.getCategories(), 3).isEmpty())
+				{
+					if (!addedUncoveredSection)
+					{
+						resultsContainer.add(sectionLabel("Uncovered"));
+						addedUncoveredSection = true;
+					}
+					resultsContainer.add(coverageCard(result));
+				}
+			}
+
+			boolean addedCoveredSection = false;
+			for (SemanticCoverageResult result : results)
+			{
+				if (!joinLimited(result.getCategories(), 3).isEmpty())
+				{
+					if (!addedCoveredSection)
+					{
+						resultsContainer.add(sectionLabel("Covered"));
+						addedCoveredSection = true;
+					}
+					resultsContainer.add(coverageCard(result));
+				}
 			}
 		}
 
@@ -221,6 +257,7 @@ public class SemanticBankSearchPanel extends PluginPanel
 		}
 
 		resultsContainer.removeAll();
+		summaryLabel.setText("Ready to search");
 		statusLabel.setText(" ");
 		resultsContainer.add(textBlock(
 			"Search your observed items",
@@ -262,7 +299,7 @@ public class SemanticBankSearchPanel extends PluginPanel
 		searchButton.addActionListener(event -> runSearch(searchField.getText()));
 		buttons.add(searchButton);
 
-		JButton allIndexedButton = new JButton("All Indexed");
+		JButton allIndexedButton = new JButton("All");
 		allIndexedButton.setFocusable(false);
 		allIndexedButton.addActionListener(event -> allIndexedConsumer.run());
 		buttons.add(allIndexedButton);
@@ -415,6 +452,25 @@ public class SemanticBankSearchPanel extends PluginPanel
 		panel.add(titleLabel, BorderLayout.NORTH);
 		panel.add(wrappedText(body), BorderLayout.CENTER);
 		return panel;
+	}
+
+	private static JLabel sectionLabel(String text)
+	{
+		JLabel label = new JLabel(text);
+		label.setForeground(ColorScheme.BRAND_ORANGE);
+		label.setFont(label.getFont().deriveFont(Font.BOLD, 12f));
+		label.setBorder(BorderFactory.createEmptyBorder(8, 8, 4, 8));
+		return label;
+	}
+
+	private static String matchSummary(int count)
+	{
+		return count == 1 ? "1 match" : count + " matches";
+	}
+
+	private static String observedSummary(int count)
+	{
+		return count == 1 ? "1 observed item" : count + " observed items";
 	}
 
 	private static JLabel detailLabel(String text)

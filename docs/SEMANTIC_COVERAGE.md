@@ -13,6 +13,19 @@ The most important rule is simple: add examples before adding rules. A useful se
 
 The database should never require external AI, network calls, downloaded data, account data, or bank contents leaving the client.
 
+## Wiki-Guided Curation
+
+OSRS Wiki strategy and activity pages are good offline references for turning common player recommendations into purpose-based search behavior. Use them as curation input, then paraphrase the useful item purposes into local static rules and tests.
+
+Good wiki-guided additions look like:
+
+- `vorkath trip` finds dragonfire protection, salve items, ranged weapons, enchanted bolts, and sustain.
+- `zulrah trip` finds venom protection, magic/ranged switch items, Zulrah travel, and sustain.
+- `fight caves trip` finds prayer restoration, ranged weapons/ammunition, brews, and long-trip sustain.
+- `wildy boss trip` finds risk-light supplies, escape teleports, blighted supplies, and freeze support.
+
+Do not copy full guide tables into the plugin. Do not add runtime wiki/API lookups. The goal is not to become a boss guide; it is to answer "which observed items I already own match this purpose?"
+
 ## Safe Coverage Workflow
 
 1. Pick a real player query, such as `barrows trip` or `herb run`.

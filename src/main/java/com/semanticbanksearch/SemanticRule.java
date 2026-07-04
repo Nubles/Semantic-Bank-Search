@@ -10,6 +10,19 @@ import java.util.Set;
 
 public class SemanticRule
 {
+    private static final Set<String> RAW_FOOD_PATTERN_EXCLUSIONS = Set.of(
+        "shark",
+        "karambwan",
+        "manta ray",
+        "anglerfish",
+        "sea turtle",
+        "monkfish",
+        "trout",
+        "salmon",
+        "lobster",
+        "swordfish",
+        "dark crab");
+
     private static final Set<String> GENERIC_CATEGORY_WORDS = Set.of(
         "weapon",
         "weapons",
@@ -99,6 +112,10 @@ public class SemanticRule
 
         for (String pattern : itemNamePatterns)
         {
+            if (isRawFoodMatchForCookedFoodPattern(normalizedItemName, pattern))
+            {
+                continue;
+            }
             if (normalizedItemName.contains(pattern))
             {
                 return true;
@@ -128,6 +145,11 @@ public class SemanticRule
             }
         }
         return score;
+    }
+
+    private static boolean isRawFoodMatchForCookedFoodPattern(String normalizedItemName, String pattern)
+    {
+        return normalizedItemName.startsWith("raw ") && RAW_FOOD_PATTERN_EXCLUSIONS.contains(pattern);
     }
 
     private List<String> normalizedCategoryWords()

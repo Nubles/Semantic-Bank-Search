@@ -63,6 +63,30 @@ public class CuratedQueryPackTest
             negatives("Xeric's talisman", "Enchanted lyre", "Ardougne cloak"));
     }
 
+    @Test
+    public void wikiGuidedBossTripQueriesFindCommonPrepItemsWithoutBleed()
+    {
+        assertQueryPack(
+            "vorkath trip",
+            positives("Extended super antifire(4)", "Anti-dragon shield", "Dragon hunter crossbow", "Salve amulet(ei)", "Ruby bolts (e)", "Diamond bolts (e)"),
+            negatives("Arclight", "Dramen staff", "Raw shark"));
+
+        assertQueryPack(
+            "zulrah trip",
+            positives("Anti-venom+(4)", "Trident of the seas", "Toxic blowpipe", "Ring of suffering", "Serpentine helm", "Zul-andra teleport"),
+            negatives("Antipoison(4)", "Anti-dragon shield", "Barrows teleport"));
+
+        assertQueryPack(
+            "fight caves trip",
+            positives("Prayer potion(4)", "Saradomin brew(4)", "Ranging potion(4)", "Toxic blowpipe", "Diamond bolts (e)", "Purple sweets"),
+            negatives("Burning amulet", "Spade", "Shantay pass"));
+
+        assertQueryPack(
+            "wildy boss trip",
+            positives("Royal seed pod", "Burning amulet", "Blighted super restore(4)", "Blighted manta ray", "Ring of dueling(8)", "Escape crystal"),
+            negatives("Xeric's talisman", "Barrows teleport", "Dragon scimitar"));
+    }
+
     private static List<String> positives(String... itemNames)
     {
         return Arrays.asList(itemNames);

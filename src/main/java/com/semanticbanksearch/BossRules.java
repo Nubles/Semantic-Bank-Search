@@ -27,6 +27,8 @@ final class BossRules
                     "dragon crossbow",
                     "ruby dragon bolts",
                     "diamond dragon bolts",
+                    "ruby bolts",
+                    "diamond bolts",
                     "salve amulet",
                     "void knight",
                     "elite void",
@@ -46,7 +48,9 @@ final class BossRules
                     "dragon hunter crossbow", 25,
                     "dragon crossbow", 18,
                     "diamond dragon bolts", 16,
-                    "ruby dragon bolts", 16),
+                    "ruby dragon bolts", 16,
+                    "ruby bolts", 14,
+                    "diamond bolts", 14),
                 120),
             SemanticLibrary.rule(
                 "Zulrah prep",
@@ -61,6 +65,9 @@ final class BossRules
                     "magic shortbow",
                     "blowpipe",
                     "crystal bow",
+                    "ring of suffering",
+                    "serpentine helm",
+                    "zul-andra teleport",
                     "ranging potion",
                     "magic potion",
                     "saradomin brew",
@@ -71,7 +78,10 @@ final class BossRules
                     "anti-venom+", 35,
                     "anti-venom", 30,
                     "trident", 25,
-                    "blowpipe", 20),
+                    "blowpipe", 20,
+                    "ring of suffering", 18,
+                    "serpentine helm", 18,
+                    "zul-andra teleport", 18),
                 120),
             SemanticLibrary.rule(
                 "Fight Caves prep",
@@ -87,13 +97,17 @@ final class BossRules
                     "crystal bow",
                     "karil",
                     "black d'hide",
+                    "diamond bolts",
+                    "purple sweets",
                     "manta ray",
                     "shark"),
                 SemanticLibrary.scores(
                     "prayer potion", 25,
                     "super restore", 25,
                     "saradomin brew", 20,
-                    "blowpipe", 20),
+                    "blowpipe", 20,
+                    "diamond bolts", 15,
+                    "purple sweets", 15),
                 120),
             SemanticLibrary.rule(
                 "Crypt prep",
@@ -181,6 +195,8 @@ final class BossRules
                 SemanticLibrary.patterns(
                     "royal seed pod",
                     "burning amulet",
+                    "ring of dueling",
+                    "escape crystal",
                     "glory",
                     "ice barrage",
                     "blood rune",
@@ -193,6 +209,8 @@ final class BossRules
                 SemanticLibrary.scores(
                     "royal seed pod", 30,
                     "burning amulet", 25,
+                    "ring of dueling", 20,
+                    "escape crystal", 20,
                     "blighted super restore", 20),
                 110));
     }

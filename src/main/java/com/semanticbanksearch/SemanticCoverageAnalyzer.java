@@ -55,10 +55,33 @@ public class SemanticCoverageAnalyzer
             }
         }
 
+        List<String> mechanicalTags = categories.isEmpty()
+            ? ItemAwarenessClassifier.mechanicalTags(item)
+            : new ArrayList<>();
+        ItemAwarenessStatus awarenessStatus = awarenessStatus(categories, mechanicalTags, item);
         return new SemanticCoverageResult(
             item,
             new ArrayList<>(categories),
             new ArrayList<>(reasons),
+            mechanicalTags,
+            awarenessStatus,
             bestScore);
+    }
+
+    private static ItemAwarenessStatus awarenessStatus(Set<String> categories, List<String> mechanicalTags, ObservedItem item)
+    {
+        if (!categories.isEmpty())
+        {
+            return ItemAwarenessStatus.SEMANTIC_COVERED;
+        }
+        if (!mechanicalTags.isEmpty())
+        {
+            return ItemAwarenessStatus.MECHANICALLY_TAGGED;
+        }
+        if (ItemAwarenessClassifier.isKnownObservedItem(item))
+        {
+            return ItemAwarenessStatus.KNOWN_UNCLASSIFIED;
+        }
+        return ItemAwarenessStatus.UNKNOWN_OBSERVED;
     }
 }

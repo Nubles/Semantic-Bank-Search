@@ -79,6 +79,21 @@ public class SemanticBankSearchPanelTest
         assertTrue(indexOf(text, "Missing") < indexOf(text, "Spade"));
         assertTrue(containsText(text, "Barrows teleport"));
     }
+
+    @Test
+    public void coverageAuditShowsMechanicalAndUnknownAwareness() throws Exception
+    {
+        SemanticBankSearchPanel panel = new SemanticBankSearchPanel(ignored -> { }, () -> { }, ignored -> { }, () -> { }, () -> { });
+
+        runOnEdt(() -> panel.updateCoverageAudit(Arrays.asList(
+            coverage("Uncut sapphire", Collections.emptyList(), Collections.singletonList("Gem"), ItemAwarenessStatus.MECHANICALLY_TAGGED),
+            coverage("Mystery item", Collections.emptyList(), Collections.emptyList(), ItemAwarenessStatus.UNKNOWN_OBSERVED)),
+            "Covered 0 of 2 observed items."));
+
+        List<String> text = visibleText(panel);
+        assertTrue(containsText(text, "Mechanical tags: Gem"));
+        assertTrue(containsText(text, "Unknown observed item"));
+    }
     private static SemanticSearchResult result(String itemName, String category)
     {
         return new SemanticSearchResult(
@@ -108,6 +123,21 @@ public class SemanticBankSearchPanelTest
         return new ReadinessSlotResult(
             new ReadinessSlot(slotName, kind, slotName, "Why this matters."),
             ownedItems);
+    }
+
+    private static SemanticCoverageResult coverage(
+        String itemName,
+        List<String> categories,
+        List<String> mechanicalTags,
+        ItemAwarenessStatus awarenessStatus)
+    {
+        return new SemanticCoverageResult(
+            new ObservedItem(100, itemName, 1, StorageSourceType.BANK, "Bank", true, 1_000L),
+            categories,
+            categories.isEmpty() ? Collections.emptyList() : Collections.singletonList("Useful item."),
+            mechanicalTags,
+            awarenessStatus,
+            categories.isEmpty() ? 0 : 100);
     }
     private static void runOnEdt(Runnable runnable) throws Exception
     {

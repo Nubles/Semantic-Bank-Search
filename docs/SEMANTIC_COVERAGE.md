@@ -53,6 +53,19 @@ Keep packs compact. They should help a player prepare from owned items, not beco
 
 Current beta readiness packs cover Barrows trip, Vorkath trip, Zulrah trip, Fight Caves, herb run, birdhouse run, farm contract, Wildy escape, Wildy boss, Dagannoth Kings, Slayer task, clue step, quest tools, and Wintertodt readiness.
 
+
+## Item Awareness States
+
+Coverage is moving toward complete OSRS item awareness in phases. Phase one does not ship a generated all-item catalog yet. Instead, it classifies observed items into clear local states:
+
+- **Semantic covered**: the item matched curated semantic rules and can answer purpose-based searches.
+- **Mechanically tagged**: the item has conservative local tags such as Food, Rune, Potion, Teleport, Seed, Log, Ore, Bar, Herb, Gem, Tool, or Equipment, but no semantic purpose category yet.
+- **Known unclassified**: the observed item has a valid resolved name, but no semantic category or mechanical tag yet.
+- **Unknown observed item**: the observed item name is missing or invalid, which usually means the item name could not be resolved and may need catalog/runtime investigation.
+
+Do not treat mechanical tags as full semantic search coverage. They are a triage aid for Coverage view and a stepping stone toward a future generated catalog.
+
+A later catalog generation step should add a committed local item-id/name dataset from a trusted source, with noted/placeholders/duplicates handled deliberately and without runtime network calls.
 ## Coverage Audit View
 
 Use the plugin's `Coverage` view before expanding a category. It shows every observed item that currently has semantic coverage and every observed item that is still uncovered.

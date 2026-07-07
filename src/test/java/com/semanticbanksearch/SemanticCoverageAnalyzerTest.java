@@ -75,6 +75,36 @@ public class SemanticCoverageAnalyzerTest
         assertTrue(results.get(1).isCovered());
     }
 
+
+    @Test
+    public void analyzerDistinguishesSemanticMechanicalKnownAndUnknownItems()
+    {
+        List<ObservedItem> items = Arrays.asList(
+            new ObservedItem(4001, "Barrows teleport", 1, StorageSourceType.BANK, "Bank", true, 1_000L),
+            new ObservedItem(4002, "Uncut sapphire", 12, StorageSourceType.BANK, "Bank", true, 1_001L),
+            new ObservedItem(4003, "Coins", 995, StorageSourceType.BANK, "Bank", true, 1_002L),
+            new ObservedItem(4004, "", 1, StorageSourceType.BANK, "Bank", true, 1_003L));
+
+        List<SemanticCoverageResult> results = new SemanticCoverageAnalyzer(SemanticLibrary.create()).analyze(items);
+
+        SemanticCoverageResult semantic = find(results, "Barrows teleport");
+        assertEquals(ItemAwarenessStatus.SEMANTIC_COVERED, semantic.getAwarenessStatus());
+        assertTrue(semantic.getMechanicalTags().isEmpty());
+
+        SemanticCoverageResult mechanical = find(results, "Uncut sapphire");
+        assertEquals(ItemAwarenessStatus.MECHANICALLY_TAGGED, mechanical.getAwarenessStatus());
+        assertEquals(Arrays.asList("Gem"), mechanical.getMechanicalTags());
+        assertFalse(mechanical.isCovered());
+
+        SemanticCoverageResult unclassified = find(results, "Coins");
+        assertEquals(ItemAwarenessStatus.KNOWN_UNCLASSIFIED, unclassified.getAwarenessStatus());
+        assertTrue(unclassified.getMechanicalTags().isEmpty());
+        assertFalse(unclassified.isCovered());
+
+        SemanticCoverageResult unknown = find(results, "");
+        assertEquals(ItemAwarenessStatus.UNKNOWN_OBSERVED, unknown.getAwarenessStatus());
+        assertTrue(unknown.getMechanicalTags().isEmpty());
+    }
     private static SemanticCoverageResult find(List<SemanticCoverageResult> results, String itemName)
     {
         for (SemanticCoverageResult result : results)

@@ -38,7 +38,7 @@ Known limitations:
 - **Search** finds observed owned items by purpose or item-name fallback.
 - **All** lists every item the plugin has observed locally, so players can check what the plugin currently knows about their bank/storage.
 - **Readiness** checks a supported trip or task query and groups observed items into owned and missing preparation slots.
-- **Coverage** audits observed items and groups them into uncovered and covered semantic items.
+- **Coverage** audits observed items and groups them into semantic-covered, mechanically known, known unclassified, and unknown observed items.
 - **Clear** resets the current panel results and bank highlights.
 
 Result summaries show match counts, observed item counts, semantic coverage totals, or required Readiness slot coverage so players can quickly tell what the plugin found.
@@ -70,7 +70,7 @@ Readiness uses the same observed-storage limits as search. If an item has not be
 
 ## Semantic Coverage
 
-The bundled semantic database is static data shipped with the plugin. It covers common teleports, potions, food, combat equipment, boss prep, slayer prep, tools, skilling supplies, skilling workflows, minigame prep, clue utility, quest/diary utility, travel, and protection items.
+The bundled semantic database is static data shipped with the plugin. It covers common teleports, potions, food, combat equipment, boss prep, slayer prep, tools, skilling supplies, skilling workflows, minigame prep, clue utility, quest/diary utility, travel, and protection items. Coverage also applies conservative mechanical tags to recognized observed items so non-semantic gaps are easier to triage.
 
 The static semantic pack also covers regional travel and utility searches such as Kourend/Zeah travel, Fossil Island travel, fairy ring access, Fremennik travel, light sources, ghostspeak items, dig clue tools, and desert protection.
 

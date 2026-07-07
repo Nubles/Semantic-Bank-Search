@@ -519,14 +519,22 @@ public class SemanticBankSearchPanel extends PluginPanel
 		body.add(detailLabel(coverageDetails(result)));
 
 		String categories = joinLimited(result.getCategories(), 3);
-		if (categories.isEmpty())
-		{
-			body.add(wrappedText("No semantic category yet."));
-		}
-		else
+		if (!categories.isEmpty())
 		{
 			String reasons = joinLimited(result.getReasons(), 2);
 			body.add(wrappedText(reasons.isEmpty() ? "Matched by semantic coverage rules." : reasons));
+		}
+		else if (!result.getMechanicalTags().isEmpty())
+		{
+			body.add(wrappedText("Mechanical tags: " + joinLimited(result.getMechanicalTags(), 4)));
+		}
+		else if (result.getAwarenessStatus() == ItemAwarenessStatus.UNKNOWN_OBSERVED)
+		{
+			body.add(wrappedText("Unknown observed item. This may need a catalog update or a valid resolved item name."));
+		}
+		else
+		{
+			body.add(wrappedText("Known item, but no semantic category yet."));
 		}
 		panel.add(body, BorderLayout.CENTER);
 		return panel;
@@ -650,9 +658,23 @@ public class SemanticBankSearchPanel extends PluginPanel
 			? "visible in bank"
 			: "remembered";
 		String categories = joinLimited(result.getCategories(), 3);
-		String coverage = categories.isEmpty()
-			? " | Uncovered"
-			: " | Categories " + categories;
+		String coverage;
+		if (!categories.isEmpty())
+		{
+			coverage = " | Categories " + categories;
+		}
+		else if (!result.getMechanicalTags().isEmpty())
+		{
+			coverage = " | Mechanically known";
+		}
+		else if (result.getAwarenessStatus() == ItemAwarenessStatus.UNKNOWN_OBSERVED)
+		{
+			coverage = " | Unknown observed item";
+		}
+		else
+		{
+			coverage = " | Known unclassified";
+		}
 		return "Source " + source
 			+ " | Quantity " + result.getQuantity()
 			+ " | " + highlightState

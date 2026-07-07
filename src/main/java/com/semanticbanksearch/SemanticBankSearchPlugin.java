@@ -29,7 +29,7 @@ import net.runelite.client.ui.overlay.OverlayManager;
 
 @PluginDescriptor(
 	name = "Semantic Bank Search",
-	description = "Searches observed bank and storage items by purpose using local semantic rules.",
+	description = "Beta: searches observed bank and storage items by purpose using local semantic rules.",
 	tags = {"bank", "search", "items", "storage", "utility"}
 )
 public class SemanticBankSearchPlugin extends Plugin

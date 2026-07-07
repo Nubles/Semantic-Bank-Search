@@ -51,7 +51,7 @@ Use readiness packs when a query needs a grouped answer:
 
 Keep packs compact. They should help a player prepare from owned items, not become full activity guides. Missing slots mean "not found in observed storage," not "the account definitely does not own this item."
 
-Current starter packs cover Barrows trip, herb run, Wildy escape, and clue step readiness.
+Current beta readiness packs cover Barrows trip, Vorkath trip, Zulrah trip, Fight Caves, herb run, birdhouse run, farm contract, Wildy escape, Wildy boss, Dagannoth Kings, Slayer task, clue step, quest tools, and Wintertodt readiness.
 
 ## Coverage Audit View
 

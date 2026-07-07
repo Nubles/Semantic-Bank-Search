@@ -1,8 +1,21 @@
 # Semantic Bank Search
 
-A RuneLite external plugin that lets players search observed owned items by purpose instead of exact item name.
+Semantic Bank Search is a **beta** RuneLite external plugin that lets players search observed owned items by purpose instead of exact item name.
 
-Semantic Bank Search is local-only and passive. It searches items the client has observed, shows matching results, and highlights matching visible bank items. It does not use external AI, call web services, or act on items.
+It is local-only and passive. It searches items the client has observed, shows matching results, and highlights matching visible bank items. It does not use external AI, call web services, click items, withdraw items, deposit items, or modify menus.
+
+## Beta Status
+
+This beta is suitable for early users who understand that semantic coverage is curated and still growing. The plugin is designed to be safe first, useful second, and comprehensive over time.
+
+Known limitations:
+
+- Search and Readiness only know about items observed in the bank or safe remembered storage.
+- Missing Readiness slots mean "not observed," not "definitely not owned."
+- Purpose coverage is broad enough for common utility, travel, skilling, Slayer, clue, and boss-prep searches, but it is not complete OSRS item coverage.
+- Readiness packs are compact prep checklists, not full boss/activity guides.
+- POH storage is not inferred.
+- Screenshots and real-bank QA should be completed before calling this a 1.0 release.
 
 ## Example Searches
 
@@ -28,21 +41,30 @@ Semantic Bank Search is local-only and passive. It searches items the client has
 - **Coverage** audits observed items and groups them into uncovered and covered semantic items.
 - **Clear** resets the current panel results and bank highlights.
 
-Result summaries show match counts, observed item counts, or semantic coverage totals so players can quickly tell what the plugin found.
+Result summaries show match counts, observed item counts, semantic coverage totals, or required Readiness slot coverage so players can quickly tell what the plugin found.
 
 Search is typo-tolerant for common misspellings. Fuzzy matching is conservative: it helps with longer misspelled purpose words and item names, while short risky words such as `axe`, `bar`, `bow`, `law`, and `ring` stay mostly exact to avoid noisy results.
-
 
 ## Readiness Mode
 
 Readiness mode turns a supported purpose query into a lightweight prep checklist. Instead of only listing matching items, it shows owned slots, missing slots, and the best observed substitutes for that task.
 
-Starter readiness packs include:
+Supported beta readiness packs:
 
 - barrows trip
+- vorkath trip
+- zulrah trip
+- fight caves
 - herb run
+- birdhouse run
+- farm contract
 - wildy escape
+- wildy boss
+- dagannoth kings
+- slayer task
 - clue step
+- quest tools
+- wintertodt
 
 Readiness uses the same observed-storage limits as search. If an item has not been observed in the bank or a safe remembered storage source, the plugin treats that slot as missing. It remains advisory only: it highlights owned visible bank items, but does not click, withdraw, deposit, or change menus.
 
@@ -70,6 +92,12 @@ Semantic Bank Search does not:
 - send bank contents anywhere
 - infer unobserved storage contents
 
+## Beta Release QA
+
+Before promoting a beta build, run the automated tests and complete the manual in-game checklist in [Beta Release Checklist](docs/BETA_RELEASE_CHECKLIST.md).
+
+Manual QA should confirm Search, All, Readiness, Coverage, highlighting, remembered storage, and Clear behavior against a real messy bank.
+
 ## Quality Workflow
 
 Semantic coverage is protected by repeatable tests and scorecards:
@@ -84,5 +112,6 @@ For semantic changes, run:
 .\gradlew.bat test --tests com.semanticbanksearch.SemanticQaScorecardTest
 .\gradlew.bat test --tests com.semanticbanksearch.CuratedQueryPackTest
 .\gradlew.bat test --tests com.semanticbanksearch.SemanticSearchEngineTest
+.\gradlew.bat test --tests com.semanticbanksearch.ReadinessAnalyzerTest
 .\gradlew.bat test
 ```

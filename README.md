@@ -92,26 +92,6 @@ Semantic Bank Search does not:
 - send bank contents anywhere
 - infer unobserved storage contents
 
-## Beta Release QA
+## Contributing And QA
 
-Before promoting a beta build, run the automated tests and complete the manual in-game checklist in [Beta Release Checklist](docs/BETA_RELEASE_CHECKLIST.md).
-
-Manual QA should confirm Search, All, Readiness, Coverage, highlighting, remembered storage, and Clear behavior against a real messy bank.
-
-## Quality Workflow
-
-Semantic coverage is protected by repeatable tests and scorecards:
-
-- [Semantic Coverage Guide](docs/SEMANTIC_COVERAGE.md) explains how to add new purpose coverage safely.
-- [Semantic QA Scorecard](docs/SEMANTIC_QA_SCORECARD.md) tracks curated player queries, expected positives, expected negatives, and current pass totals.
-- [Contributing](CONTRIBUTING.md) covers development, testing, and safety expectations.
-
-For semantic changes, run:
-
-```powershell
-.\gradlew.bat test --tests com.semanticbanksearch.SemanticQaScorecardTest
-.\gradlew.bat test --tests com.semanticbanksearch.CuratedQueryPackTest
-.\gradlew.bat test --tests com.semanticbanksearch.SemanticSearchEngineTest
-.\gradlew.bat test --tests com.semanticbanksearch.ReadinessAnalyzerTest
-.\gradlew.bat test
-```
+Contributor workflow, semantic quality checks, and beta release QA live in [Contributing](CONTRIBUTING.md). The detailed manual beta checklist lives in [Beta Release Checklist](docs/BETA_RELEASE_CHECKLIST.md).

@@ -10,11 +10,22 @@ Use the Gradle wrapper from the repository root:
 .\gradlew.bat test
 ```
 
-For semantic coverage changes, also run:
+## Quality Workflow
+
+Semantic coverage is protected by repeatable tests and scorecards:
+
+- [Semantic Coverage Guide](docs/SEMANTIC_COVERAGE.md) explains how to add new purpose coverage safely.
+- [Semantic QA Scorecard](docs/SEMANTIC_QA_SCORECARD.md) tracks curated player queries, expected positives, expected negatives, and current pass totals.
+- [Beta Release Checklist](docs/BETA_RELEASE_CHECKLIST.md) covers the manual in-game QA needed before promoting a beta build.
+
+For semantic changes, run:
 
 ```powershell
+.\gradlew.bat test --tests com.semanticbanksearch.SemanticQaScorecardTest
 .\gradlew.bat test --tests com.semanticbanksearch.CuratedQueryPackTest
 .\gradlew.bat test --tests com.semanticbanksearch.SemanticSearchEngineTest
+.\gradlew.bat test --tests com.semanticbanksearch.ReadinessAnalyzerTest
+.\gradlew.bat test
 ```
 
 ## Adding Semantic Coverage
@@ -28,6 +39,20 @@ The short version:
 3. Prefer phrase aliases over broad single-word aliases.
 4. Keep item patterns specific enough to avoid false positives.
 5. Make the smallest rule change needed to pass the tests.
+
+## Beta Release QA
+
+Before publishing or promoting a beta build, complete the automated checks and the manual in-game checklist in [Beta Release Checklist](docs/BETA_RELEASE_CHECKLIST.md).
+
+Manual QA should use a real account with a messy bank where possible, and should confirm:
+
+- Search, fuzzy search, and visible bank highlights.
+- All indexed item display and remembered storage behavior.
+- Readiness owned/missing groups for common packs.
+- Coverage grouping for uncovered and covered items.
+- Clear behavior resetting panel results and highlights.
+
+If manual QA has not been completed, say that explicitly in the PR or release notes. Do not present the plugin as 1.0 until real-bank QA, screenshots or GIFs, and beta feedback triage are complete.
 
 ## Safety Rules
 

@@ -10,6 +10,8 @@ The scorecard is not part of the RuneLite runtime UI. It is a test/reporting too
 - Expected positives found: 62/62
 - Expected negatives avoided: 44/44
 - Runtime network calls: none
+- Native bank beta queries: 13 player-facing query scenarios passing.
+- Native compatibility/performance: pass-through and 1,000-item workload gates passing.
 
 ## What It Measures
 
@@ -39,8 +41,8 @@ Run the focused scorecard test before and after semantic rule changes:
 
 ```powershell
 .\gradlew.bat test --tests com.semanticbanksearch.SemanticQaScorecardTest
+.\gradlew.bat test --tests com.semanticbanksearch.BetaNativeBankQueryPackTest
 ```
-
 For broader semantic changes, also run:
 
 ```powershell

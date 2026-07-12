@@ -42,6 +42,30 @@ public class SemanticSearchEngine
         return results;
     }
 
+    boolean hasSemanticMatch(String query)
+    {
+        return !matchingRules(normalize(query)).isEmpty();
+    }
+
+    boolean matchesPurpose(String query, String itemName)
+    {
+        String normalizedQuery = normalize(query);
+        String normalizedItemName = normalize(itemName);
+        if (normalizedQuery.isEmpty() || normalizedItemName.isEmpty())
+        {
+            return false;
+        }
+
+        for (SemanticRule rule : matchingRules(normalizedQuery))
+        {
+            if (rule.matchesItem(normalizedItemName))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private List<SemanticRule> matchingRules(String normalizedQuery)
     {
         List<SemanticRule> matches = new ArrayList<>();

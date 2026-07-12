@@ -8,19 +8,31 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import javax.inject.Inject;
 import net.runelite.api.Client;
+import net.runelite.api.InventoryID;
+import net.runelite.api.Item;
+import net.runelite.api.ItemContainer;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.ScriptCallbackEvent;
 import net.runelite.api.widgets.ComponentID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.game.ItemEquipmentStats;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.ItemStats;
+import net.runelite.client.plugins.itemstats.Effect;
+import net.runelite.client.plugins.itemstats.ItemStatChangesService;
+import net.runelite.client.plugins.itemstats.StatChange;
+import net.runelite.client.plugins.itemstats.stats.Stats;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -80,9 +92,14 @@ public class SemanticBankSearchPlugin extends Plugin
 	@Inject
 	private Gson gson;
 
+	@Inject
+	private ItemStatChangesService itemStatChangesService;
+
 	private final Object viewStateLock = new Object();
+	private final RelativeRankingClassifier rankingClassifier = new RelativeRankingClassifier();
 	private StorageIndex index;
 	private SemanticSearchEngine engine;
+	private SemanticBankFilter bankFilter;
 	private SemanticCoverageAnalyzer coverageAnalyzer;
 	private ReadinessAnalyzer readinessAnalyzer;
 	private ObservedStorageScanner storageScanner;
@@ -111,6 +128,7 @@ public class SemanticBankSearchPlugin extends Plugin
 			configManager.getConfiguration(SemanticBankSearchConfig.GROUP, STORAGE_KEY));
 		List<SemanticRule> rules = SemanticLibrary.create();
 		engine = new SemanticSearchEngine(rules);
+		bankFilter = new SemanticBankFilter(engine, this::resolveItemMetadata, this::visibleBankItemIds);
 		coverageAnalyzer = new SemanticCoverageAnalyzer(rules);
 		readinessAnalyzer = new ReadinessAnalyzer(rules, ReadinessPackLibrary.create());
 		storageScanner = new ObservedStorageScanner(
@@ -152,6 +170,7 @@ public class SemanticBankSearchPlugin extends Plugin
 		panel = null;
 		overlay = null;
 		engine = null;
+		bankFilter = null;
 		coverageAnalyzer = null;
 		readinessAnalyzer = null;
 		storageScanner = null;
@@ -173,6 +192,37 @@ public class SemanticBankSearchPlugin extends Plugin
 		long now = System.currentTimeMillis();
 		bankOpen = isBankOpen();
 		handleObservedStorageTick(now);
+	}
+
+	@Subscribe
+	public void onScriptCallbackEvent(ScriptCallbackEvent event)
+	{
+		if (event == null || !"bankSearchFilter".equals(event.getEventName()) || bankFilter == null)
+		{
+			return;
+		}
+
+		int intStackSize = client.getIntStackSize();
+		int objectStackSize = client.getObjectStackSize();
+		if (intStackSize < 2 || objectStackSize < 1)
+		{
+			return;
+		}
+
+		int[] intStack = client.getIntStack();
+		Object[] objectStack = client.getObjectStack();
+		Object inputValue = objectStack[objectStackSize - 1];
+		if (!(inputValue instanceof String))
+		{
+			return;
+		}
+
+		int itemId = intStack[intStackSize - 1];
+		Boolean decision = bankFilter.decision((String) inputValue, itemId);
+		if (decision != null)
+		{
+			intStack[intStackSize - 2] = decision ? 1 : 0;
+		}
 	}
 
 	private void runSearch(String query)
@@ -342,7 +392,9 @@ public class SemanticBankSearchPlugin extends Plugin
 			return;
 		}
 
-		List<SemanticSearchResult> results = engine.search(query, index);
+		List<SemanticSearchResult> results = rankingClassifier.recognizes(query)
+			? relativeRankingResults(query)
+			: engine.search(query, index);
 		List<Integer> highlightedItemIds = new ArrayList<>();
 		for (SemanticSearchResult result : results)
 		{
@@ -362,6 +414,48 @@ public class SemanticBankSearchPlugin extends Plugin
 		}
 	}
 
+
+	private List<SemanticSearchResult> relativeRankingResults(String query)
+	{
+		List<ObservedItem> observedItems = index.items();
+		Map<Integer, BankItemMetadata> metadataById = new HashMap<>();
+		List<BankItemMetadata> ownedMetadata = new ArrayList<>();
+		for (ObservedItem item : observedItems)
+		{
+			if (!metadataById.containsKey(item.getItemId()))
+			{
+				BankItemMetadata metadata = resolveItemMetadata(item.getItemId());
+				metadataById.put(item.getItemId(), metadata);
+				if (metadata != null)
+				{
+					ownedMetadata.add(metadata);
+				}
+			}
+		}
+
+		List<SemanticSearchResult> results = new ArrayList<>();
+		for (ObservedItem item : observedItems)
+		{
+			BankItemMetadata metadata = metadataById.get(item.getItemId());
+			if (rankingClassifier.matches(query, metadata, ownedMetadata))
+			{
+				results.add(new SemanticSearchResult(
+					item.getItemId(),
+					item.getName(),
+					item.getQuantity(),
+					item.getSourceType(),
+					item.getSourceName(),
+					item.isCurrentlyVisible(),
+					"Owned ranking",
+					rankingClassifier.explanation(query, metadata),
+					rankingClassifier.score(query, metadata)));
+			}
+		}
+		results.sort(Comparator
+			.comparingInt(SemanticSearchResult::getScore).reversed()
+			.thenComparing(SemanticSearchResult::getItemName, String.CASE_INSENSITIVE_ORDER));
+		return results;
+	}
 	private static List<Integer> readinessHighlightedItemIds(ReadinessResult result)
 	{
 		List<Integer> highlightedItemIds = new ArrayList<>();
@@ -605,6 +699,99 @@ public class SemanticBankSearchPlugin extends Plugin
 		}
 	}
 
+	private BankItemMetadata resolveItemMetadata(int itemId)
+	{
+		ItemComposition itemComposition = itemManager.getItemComposition(itemId);
+		if (itemComposition == null)
+		{
+			return null;
+		}
+
+		String[] actions = itemComposition.getInventoryActions();
+		boolean wieldable = false;
+		boolean actionEquipable = false;
+		boolean edible = false;
+		boolean drinkable = false;
+		if (actions != null)
+		{
+			for (String action : actions)
+			{
+				if ("Wield".equalsIgnoreCase(action))
+				{
+					wieldable = true;
+				}
+				actionEquipable |= "Wield".equalsIgnoreCase(action) || "Wear".equalsIgnoreCase(action);
+				edible |= "Eat".equalsIgnoreCase(action);
+				drinkable |= "Drink".equalsIgnoreCase(action);
+			}
+		}
+
+		ItemStats stats = itemManager.getItemStats(itemId);
+		ItemEquipmentStats equipment = stats == null ? null : stats.getEquipment();
+		return new BankItemMetadata(
+			resolveItemName(itemId),
+			actionEquipable || stats != null && stats.isEquipable(),
+			wieldable,
+			edible,
+			drinkable,
+			equipment == null ? -1 : equipment.getSlot(),
+			equipment == null ? 0 : equipment.getAstab(),
+			equipment == null ? 0 : equipment.getAslash(),
+			equipment == null ? 0 : equipment.getAcrush(),
+			equipment == null ? 0 : equipment.getAmagic(),
+			equipment == null ? 0 : equipment.getArange(),
+			equipment == null ? 0 : equipment.getStr(),
+			equipment == null ? 0 : equipment.getRstr(),
+			equipment == null ? 0 : equipment.getMdmg(),
+			equipment == null ? 0 : equipment.getPrayer(),
+			resolveHealing(itemId));
+	}
+
+	private int resolveHealing(int itemId)
+	{
+		try
+		{
+			Effect effect = itemStatChangesService.getItemStatChanges(itemId);
+			if (effect == null)
+			{
+				return -1;
+			}
+
+			for (StatChange change : effect.calculate(client).getStatChanges())
+			{
+				if (change != null && change.getStat() == Stats.HITPOINTS)
+				{
+					return Math.max(0, change.getTheoretical());
+				}
+			}
+		}
+		catch (RuntimeException ignored)
+		{
+			// Missing or level-dependent data should not satisfy numerical queries.
+		}
+		return -1;
+	}
+
+
+	private List<Integer> visibleBankItemIds()
+	{
+		ItemContainer bank = client.getItemContainer(InventoryID.BANK);
+		if (bank == null)
+		{
+			return new ArrayList<>();
+		}
+
+		List<Integer> itemIds = new ArrayList<>();
+		Set<Integer> seen = new HashSet<>();
+		for (Item item : bank.getItems())
+		{
+			if (item != null && item.getId() > 0 && seen.add(item.getId()))
+			{
+				itemIds.add(item.getId());
+			}
+		}
+		return itemIds;
+	}
 	private void persist()
 	{
 		persist(System.currentTimeMillis());

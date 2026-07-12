@@ -2,6 +2,18 @@
 
 Semantic Bank Search is a **beta** RuneLite external plugin that lets players search observed owned items by purpose instead of exact item name.
 
+With the bank open, type a purpose directly into RuneLite's bank search, such as `prayer restoration`, `warm clothing`, or `things that cut webs`. Recognized purpose searches filter the live bank. Use the plain prefix `sem `, for example `sem fastest food`, to explicitly request semantic mode; no `tag:` prefix or colon is required. Ordinary item-name searches and Bank Tags syntax are left to RuneLite and Bank Tags.
+
+Broad equipment searches use local RuneLite metadata: `weapon`, `weapons`, `wep`, `weps`, `armour`, `armor`, `gear`, `equipment`, `melee gear`, `range gear`, `mage gear`, and `prayer gear`.
+
+Consumable searches also use live item actions: `food`, `foods`, `potions`, `pots`, `combo food`, `full pots`, and `low dose pots`.
+
+Supported compound searches apply every recognized constraint rather than combining broad results. Examples include `4 dose prayer pots`, `melee gear with prayer`, and `ranged weapons for dragons`. Initial target-purpose composition covers dragons, demons, and undead.
+
+Numerical filters use local RuneLite values and fail closed when data is unavailable. Supported examples include `food over 18 hp`, `food at least 20 hp`, `prayer gear over +5`, and `prayer gear at least +8`.
+
+Relative searches compare only items the player owns: `best food`, `good food`, `best prayer gear`, `strongest melee weapon`, `strongest ranged weapon`, and `strongest magic weapon`. The sidebar explains the winning value, while prayer gear is compared separately for each equipment slot.
+
 It is local-only and passive. It searches items the client has observed, shows matching results, and highlights matching visible bank items. It does not use external AI, call web services, click items, withdraw items, deposit items, or modify menus.
 
 ## Beta Status

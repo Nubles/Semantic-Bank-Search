@@ -24,6 +24,7 @@ For semantic changes, run:
 .\gradlew.bat test --tests com.semanticbanksearch.SemanticQaScorecardTest
 .\gradlew.bat test --tests com.semanticbanksearch.CuratedQueryPackTest
 .\gradlew.bat test --tests com.semanticbanksearch.SemanticSearchEngineTest
+.\gradlew.bat test --tests com.semanticbanksearch.BetaNativeBankQueryPackTest
 .\gradlew.bat test --tests com.semanticbanksearch.ReadinessAnalyzerTest
 .\gradlew.bat test
 ```
@@ -38,7 +39,8 @@ The short version:
 2. Add expected positive and negative examples to the curated query pack.
 3. Prefer phrase aliases over broad single-word aliases.
 4. Keep item patterns specific enough to avoid false positives.
-5. Make the smallest rule change needed to pass the tests.`r`n6. Use mechanical item-awareness tags only as triage aids; do not treat them as semantic purpose coverage.
+5. Make the smallest rule change needed to pass the tests.
+6. Use mechanical item-awareness tags only as triage aids; do not treat them as semantic purpose coverage.
 
 ## Beta Release QA
 

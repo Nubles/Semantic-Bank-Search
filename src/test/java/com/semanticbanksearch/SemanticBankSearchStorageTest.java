@@ -1,67 +1,38 @@
 package com.semanticbanksearch;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.junit.Test;
 
 public class SemanticBankSearchStorageTest
 {
-    @Test
-    public void badJsonReturnsEmptyStorageIndex()
+    @Test public void documentConversionOmitsObservedItemNames()
     {
-        StorageIndex loaded = SemanticBankSearchStorage.deserialize(new Gson(), "{bad json");
-
-        assertTrue(loaded.items().isEmpty());
+        StorageIndex index = new StorageIndex(); index.record(2434, "Prayer potion(4)", 2, StorageSourceType.BANK, "Bank", true, 1000L);
+        String json = new Gson().toJson(SemanticBankSearchStorage.toDocument(index)); JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        assertFalse(json.contains("Prayer potion")); assertFalse(root.getAsJsonArray("items").get(0).getAsJsonObject().has("name"));
     }
 
-    @Test
-    public void roundTripPreservesStoredItem()
+    @Test public void documentConversionRehydratesNamesFromResolver()
     {
-        StorageIndex index = new StorageIndex();
-        index.record(100, "Prayer potion(4)", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
-
-        String json = SemanticBankSearchStorage.serialize(new Gson(), index);
-        StorageIndex loaded = SemanticBankSearchStorage.deserialize(new Gson(), json);
-
-        assertEquals("Prayer potion(4)", loaded.items().get(0).getName());
-        assertEquals(2, loaded.items().get(0).getQuantity());
-        assertEquals(StorageSourceType.BANK, loaded.items().get(0).getSourceType());
-        assertTrue(loaded.items().get(0).isCurrentlyVisible());
+        AccountStorageDocument document = new Gson().fromJson("{\"schemaVersion\":1,\"items\":[{\"itemId\":2434,\"quantity\":2,\"sourceType\":\"BANK\",\"sourceName\":\"Bank\",\"currentlyVisible\":true,\"lastSeenMillis\":1000}]}", AccountStorageDocument.class);
+        ObservedItem item = SemanticBankSearchStorage.toIndex(document, id -> "Prayer potion(4)").items().get(0);
+        assertEquals("Prayer potion(4)", item.getName()); assertEquals(2, item.getQuantity()); assertEquals(StorageSourceType.BANK, item.getSourceType());
     }
 
-    @Test
-    public void roundTripPreservesNonBankStorageSource()
+    @Test public void documentConversionNormalizesInvalidStoredValues()
     {
-        StorageIndex index = new StorageIndex();
-        index.record(100, "Ranarr seed", 10, StorageSourceType.OTHER_STORAGE, "Seed Vault", true, 1_000L);
-
-        String json = SemanticBankSearchStorage.serialize(new Gson(), index);
-        StorageIndex loaded = SemanticBankSearchStorage.deserialize(new Gson(), json);
-
-        assertEquals("Ranarr seed", loaded.items().get(0).getName());
-        assertEquals(10, loaded.items().get(0).getQuantity());
-        assertEquals(StorageSourceType.OTHER_STORAGE, loaded.items().get(0).getSourceType());
-        assertEquals("Seed Vault", loaded.items().get(0).getSourceName());
-        assertTrue(loaded.items().get(0).isCurrentlyVisible());
+        AccountStorageDocument document = new Gson().fromJson("{\"schemaVersion\":1,\"items\":[{\"itemId\":2434,\"quantity\":-2,\"sourceType\":null,\"sourceName\":null,\"lastSeenMillis\":-1000},{\"itemId\":0}]}", AccountStorageDocument.class);
+        ObservedItem item = SemanticBankSearchStorage.toIndex(document, id -> " ").items().get(0);
+        assertEquals("Item 2434", item.getName()); assertEquals(0, item.getQuantity()); assertEquals(StorageSourceType.OTHER_STORAGE, item.getSourceType()); assertEquals("", item.getSourceName()); assertEquals(0L, item.getLastSeenMillis());
     }
 
-    @Test
-    public void malformedItemFieldsDeserializeIntoUsableStorageIndex()
+    @Test public void resolverFailureUsesStableFallbackName()
     {
-        String json = "{\"items\":[{\"itemId\":100,\"name\":\" Prayer potion(4) \",\"quantity\":2,"
-            + "\"sourceType\":\"BANK\",\"sourceName\":null,\"currentlyVisible\":true,\"lastSeenMillis\":1000}]}";
-
-        StorageIndex loaded = SemanticBankSearchStorage.deserialize(new Gson(), json);
-
-        assertEquals("Prayer potion(4)", loaded.items().get(0).getName());
-        assertEquals("", loaded.items().get(0).getSourceName());
-        assertEquals(StorageSourceType.BANK, loaded.items().get(0).getSourceType());
-
-        loaded.markSourceNotVisible(StorageSourceType.BANK, "");
-
-        assertFalse(loaded.items().get(0).isCurrentlyVisible());
+        AccountStorageDocument document = new Gson().fromJson("{\"schemaVersion\":1,\"items\":[{\"itemId\":4151}]}", AccountStorageDocument.class);
+        assertEquals("Item 4151", SemanticBankSearchStorage.toIndex(document, id -> { throw new IllegalStateException(); }).items().get(0).getName());
     }
 }

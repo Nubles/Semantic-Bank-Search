@@ -2,18 +2,28 @@ package com.semanticbanksearch;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 public class StorageIndex
 {
+    private static final Comparator<ObservedItem> RETENTION_ORDER = Comparator
+        .comparing(StorageIndex::isProtectedVisibleBankEntry)
+        .thenComparingLong(ObservedItem::getLastSeenMillis)
+        .thenComparingInt(ObservedItem::getItemId)
+        .thenComparing(ObservedItem::getSourceType)
+        .thenComparing(item -> item.getSourceName().toLowerCase(Locale.ROOT));
+
     private List<ObservedItem> items = new ArrayList<>();
 
     public List<ObservedItem> items()
     {
-        items.sort(Comparator.comparingLong(ObservedItem::getLastSeenMillis));
+        List<ObservedItem> orderedItems = new ArrayList<>(items);
+        orderedItems.sort(Comparator.comparingLong(ObservedItem::getLastSeenMillis));
         List<ObservedItem> snapshots = new ArrayList<>();
-        for (ObservedItem item : items)
+        for (ObservedItem item : orderedItems)
         {
             snapshots.add(new ObservedItem(item));
         }
@@ -98,20 +108,56 @@ public class StorageIndex
         }
     }
 
-    public void trimToMaximumEntries(int maximumEntries)
+    void trimToLimits(int maximumAccountEntries, int maximumEntriesPerSource)
     {
-        if (maximumEntries <= 0)
+        Map<String, List<ObservedItem>> itemsBySource = new LinkedHashMap<>();
+        for (ObservedItem item : items)
         {
-            items.clear();
+            String sourceKey = item.getSourceType() + "|" + item.getSourceName().toLowerCase(Locale.ROOT);
+            List<ObservedItem> sourceItems = itemsBySource.get(sourceKey);
+            if (sourceItems == null)
+            {
+                sourceItems = new ArrayList<>();
+                itemsBySource.put(sourceKey, sourceItems);
+            }
+            sourceItems.add(item);
+        }
+
+        for (List<ObservedItem> sourceItems : itemsBySource.values())
+        {
+            trim(sourceItems, maximumEntriesPerSource);
+        }
+
+        trim(new ArrayList<>(items), maximumAccountEntries);
+    }
+
+    private void trim(List<ObservedItem> candidates, int maximumEntries)
+    {
+        int remainingEntriesToRemove = candidates.size() - maximumEntries;
+        if (remainingEntriesToRemove <= 0)
+        {
             return;
         }
 
-        items.sort(Comparator.comparingLong(ObservedItem::getLastSeenMillis));
-        while (items.size() > maximumEntries)
+        candidates.sort(RETENTION_ORDER);
+        for (ObservedItem candidate : candidates)
         {
-            Iterator<ObservedItem> iterator = items.iterator();
-            iterator.next();
-            iterator.remove();
+            if (isProtectedVisibleBankEntry(candidate))
+            {
+                continue;
+            }
+
+            items.remove(candidate);
+            remainingEntriesToRemove--;
+            if (remainingEntriesToRemove == 0)
+            {
+                return;
+            }
         }
+    }
+
+    private static boolean isProtectedVisibleBankEntry(ObservedItem item)
+    {
+        return item.getSourceType() == StorageSourceType.BANK && item.isCurrentlyVisible();
     }
 }

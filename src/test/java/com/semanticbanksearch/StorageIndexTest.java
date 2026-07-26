@@ -98,7 +98,7 @@ public class StorageIndexTest
         index.record(101, "Middle item", 1, StorageSourceType.BANK, "Bank", false, 2_000L);
         index.record(102, "New item", 1, StorageSourceType.BANK, "Bank", false, 3_000L);
 
-        index.trimToMaximumEntries(2);
+        index.trimToLimits(2, 2);
 
         assertEquals(2, index.items().size());
         assertEquals(101, index.items().get(0).getItemId());
@@ -106,6 +106,41 @@ public class StorageIndexTest
     }
 
     @Test
+    public void trimsEachStorageSourceBeforeAccountTotal()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(100, "First source oldest", 1, StorageSourceType.OTHER_STORAGE, "First", false, 3_000L);
+        index.record(101, "First source middle", 1, StorageSourceType.OTHER_STORAGE, "First", false, 4_000L);
+        index.record(102, "First source newest", 1, StorageSourceType.OTHER_STORAGE, "First", false, 5_000L);
+        index.record(200, "Second source oldest", 1, StorageSourceType.OTHER_STORAGE, "Second", false, 1_000L);
+        index.record(201, "Second source newest", 1, StorageSourceType.OTHER_STORAGE, "Second", false, 2_000L);
+
+        index.trimToLimits(4, 2);
+
+        assertEquals(Arrays.asList(200, 201, 101, 102), itemIds(index.items()));
+    }
+
+    @Test
+    public void returnsSnapshotsWithoutReorderingMutableBackingState()
+    {
+        StorageIndex withoutSnapshot = equalTimestampIndex();
+        StorageIndex withSnapshot = equalTimestampIndex();
+
+        withSnapshot.items();
+
+        withoutSnapshot.record(1, "Old item", 1, StorageSourceType.BANK, "Bank", false, 2_000L);
+        withSnapshot.record(1, "Old item", 1, StorageSourceType.BANK, "Bank", false, 2_000L);
+        withoutSnapshot.record(3, "New item", 1, StorageSourceType.BANK, "Bank", false, 2_000L);
+        withSnapshot.record(3, "New item", 1, StorageSourceType.BANK, "Bank", false, 2_000L);
+
+        withoutSnapshot.trimToLimits(2, 2);
+        withSnapshot.trimToLimits(2, 2);
+
+        assertEquals(itemIds(withoutSnapshot.items()), itemIds(withSnapshot.items()));
+        assertEquals(Arrays.asList(2, 3), itemIds(withSnapshot.items()));
+    }
+    @Test
+
     public void nonBankSourceItemsBecomeRememberedWhenSourceCloses()
     {
         StorageIndex index = new StorageIndex();
@@ -131,5 +166,23 @@ public class StorageIndexTest
             }
         }
         throw new AssertionError("Missing item " + itemId);
+    }
+    private static StorageIndex equalTimestampIndex()
+
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(2, "Newer item", 1, StorageSourceType.BANK, "Bank", false, 2_000L);
+        index.record(1, "Older item", 1, StorageSourceType.BANK, "Bank", false, 1_000L);
+        return index;
+    }
+
+    private static List<Integer> itemIds(List<ObservedItem> items)
+    {
+        List<Integer> itemIds = new java.util.ArrayList<>();
+        for (ObservedItem item : items)
+        {
+            itemIds.add(item.getItemId());
+        }
+        return itemIds;
     }
 }

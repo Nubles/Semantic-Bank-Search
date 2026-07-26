@@ -34,16 +34,16 @@ public interface SemanticBankSearchConfig extends Config
 
 	@Range(
 		min = 100,
-		max = 2000
+		max = 20_000
 	)
 	@ConfigItem(
 		keyName = "maximumRememberedEntries",
-		name = "Maximum remembered entries",
-		description = "Maximum number of locally observed item entries to retain.",
+		name = "Account-local observed-entry limit",
+		description = "Maximum number of account-local observed item entries to retain.",
 		position = 2
 	)
 	default int maximumRememberedEntries()
 	{
-		return 800;
+		return 5_000;
 	}
 }

@@ -647,7 +647,7 @@ public class SemanticBankSearchPlugin extends Plugin
 		}
 		visibleStorageSourceKeys.clear();
 		visibleStorageSourceKeys.addAll(currentlyVisibleSourceKeys);
-		index.trimToMaximumEntries(config.maximumRememberedEntries());
+		new StorageRetentionPolicy(config.maximumRememberedEntries()).apply(index);
 		return changed;
 	}
 

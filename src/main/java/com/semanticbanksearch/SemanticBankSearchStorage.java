@@ -50,11 +50,14 @@ class SemanticBankSearchStorage
         return "Item " + itemId;
     }
 
+    // Compatibility for the plugin until Task 7 removes the legacy configuration flow.
+    @Deprecated
     static String serialize(Gson gson, StorageIndex index)
     {
         return gson == null ? "" : gson.toJson(index == null ? new StorageIndex() : index);
     }
 
+    @Deprecated
     static StorageIndex deserialize(Gson gson, String json)
     {
         if (gson == null || json == null || json.trim().isEmpty()) return new StorageIndex();

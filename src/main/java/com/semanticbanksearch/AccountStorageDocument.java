@@ -15,6 +15,8 @@ class AccountStorageDocument
 
     boolean isSupported()
     {
-        return schemaVersion == AccountStorageRepository.SCHEMA_VERSION && items != null;
+        return schemaVersion == AccountStorageRepository.SCHEMA_VERSION
+            && AccountStorageRepository.CURRENT_CATALOGUE_VERSION.equals(catalogueVersion)
+            && items != null;
     }
 }

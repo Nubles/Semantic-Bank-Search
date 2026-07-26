@@ -52,9 +52,25 @@ public class AccountStorageRepositoryTest
     @Test public void malformedJsonIsQuarantinedAndReturnsEmptyIndex() throws IOException { malformedIsQuarantined("{bad json"); }
     @Test public void unsupportedSchemaIsQuarantinedAndReturnsEmptyIndex() throws IOException { malformedIsQuarantined("{\"schemaVersion\":2,\"items\":[]}"); }
 
+    @Test public void missingOrBlankCatalogueVersionIsQuarantined() throws IOException
+    {
+        documentIsQuarantined(key(123456789L), "{\"schemaVersion\":1,\"items\":[]}");
+        documentIsQuarantined(key(987654321L), "{\"schemaVersion\":1,\"catalogueVersion\":\" \",\"items\":[]}");
+    }
+
+    private void documentIsQuarantined(AccountKey key, String json) throws IOException
+    {
+        Files.createDirectories(path(key).getParent());
+        Files.writeString(path(key), json, StandardCharsets.UTF_8);
+        AccountStorageLoadResult loaded = repo().load(key, id -> "Item " + id);
+        Path corrupt = path(key).resolveSibling("index.corrupt-" + FIXED_MILLIS + ".json");
+        assertTrue(loaded.index().items().isEmpty());
+        assertEquals(Optional.of(corrupt), loaded.quarantinedPath());
+        assertTrue(Files.exists(corrupt));
+    }
     @Test public void invalidEntriesAreDroppedDuringLoad() throws IOException
     {
-        AccountKey k = key(123456789L); Files.createDirectories(path(k).getParent()); Files.writeString(path(k), "{\"schemaVersion\":1,\"items\":[{\"itemId\":0},{\"itemId\":2434,\"quantity\":-2,\"sourceType\":null,\"sourceName\":null,\"lastSeenMillis\":-1}]}", StandardCharsets.UTF_8);
+        AccountKey k = key(123456789L); Files.createDirectories(path(k).getParent()); Files.writeString(path(k), "{\"schemaVersion\":1,\"catalogueVersion\":\"legacy-rules-v1\",\"items\":[{\"itemId\":0},{\"itemId\":2434,\"quantity\":-2,\"sourceType\":null,\"sourceName\":null,\"lastSeenMillis\":-1}]}", StandardCharsets.UTF_8);
         ObservedItem item = repo().load(k, id -> " ").index().items().get(0); assertEquals("Item 2434", item.getName()); assertEquals(0, item.getQuantity()); assertEquals(StorageSourceType.OTHER_STORAGE, item.getSourceType()); assertEquals("", item.getSourceName()); assertEquals(0L, item.getLastSeenMillis());
     }
 

@@ -95,6 +95,21 @@ public class AccountSessionControllerTest
         assertTrue(containsItem(repository().load(key(101L), this::itemName).index(), 101));
     }
 
+    @Test public void deactivationDropsStateAndReportsSaveFailure() throws IOException
+    {
+        AccountSessionController controller = controller();
+        controller.switchTo(101L).getActiveIndex().record(101, "Account A item", 1, StorageSourceType.BANK, "Bank", false, 1L);
+        assertEquals(Optional.empty(), controller.persist());
+        replaceStorageDirectoryWithFile();
+
+        AccountSessionUpdate update = controller.deactivate();
+
+        assertTrue(update.isChanged());
+        assertTrue(update.getNotices().contains(SAVE_FAILURE_NOTICE));
+        assertNull(update.getActiveIndex());
+        assertNull(controller.activeIndexOrNull());
+        assertNull(controller.activeAccountKeyOrNull());
+    }
     @Test public void failedSaveStillDropsPreviousAccountBeforeSwitch() throws IOException
     {
         AccountSessionController controller = controller();

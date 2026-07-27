@@ -79,6 +79,23 @@ public class AccountStorageRepositoryTest
         AccountKey a = key(123456789L), b = key(987654321L); AccountStorageRepository r = repo(); r.save(a, index(2434, "Prayer potion", 2)); r.save(b, index(4151, "Abyssal whip", 1)); r.clear(a); assertFalse(Files.exists(path(a))); assertTrue(Files.exists(path(b)));
     }
 
+    @Test public void clearRemovesAllSelectedAccountArtifactsWithoutTouchingAnotherAccount() throws IOException
+    {
+        AccountKey a = key(123456789L), b = key(987654321L);
+        AccountStorageRepository repository = repo();
+        repository.save(a, index(2434, "Prayer potion", 2));
+        repository.save(b, index(4151, "Abyssal whip", 1));
+        Path accountADirectory = path(a).getParent();
+        Files.writeString(accountADirectory.resolve("index.json.tmp"), "temporary", StandardCharsets.UTF_8);
+        Files.writeString(accountADirectory.resolve("index.corrupt-" + FIXED_MILLIS + ".json"), "quarantined", StandardCharsets.UTF_8);
+        Files.writeString(accountADirectory.resolve("unrelated.txt"), "selected account only", StandardCharsets.UTF_8);
+
+        repository.clear(a);
+
+        assertFalse(Files.exists(accountADirectory));
+        assertTrue(Files.exists(path(b)));
+        assertEquals(4151, repository.load(b, id -> "Item " + id).index().items().get(0).getItemId());
+    }
     private void malformedIsQuarantined(String json) throws IOException
     {
         AccountKey k = key(123456789L); Files.createDirectories(path(k).getParent()); Files.writeString(path(k), json, StandardCharsets.UTF_8); AccountStorageLoadResult loaded = repo().load(k, id -> "Item " + id); Path corrupt = path(k).resolveSibling("index.corrupt-" + FIXED_MILLIS + ".json"); assertTrue(loaded.index().items().isEmpty()); assertFalse(Files.exists(path(k))); assertEquals(Optional.of(corrupt), loaded.quarantinedPath()); assertTrue(Files.exists(corrupt));

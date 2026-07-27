@@ -10,6 +10,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import javax.swing.SwingUtilities;
 import org.junit.Test;
 
 public class SemanticBankSearchPluginTest
@@ -165,6 +167,64 @@ public class SemanticBankSearchPluginTest
         assertTrue(overlay.lastHighlightedItemIds.contains(301));
         assertFalse(overlay.lastHighlightedItemIds.contains(999));
     }
+
+    @Test
+    public void pluginRendersAreDeferredOntoSwingExecutor() throws Exception
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(100, "Coins", 100, StorageSourceType.BANK, "Bank", true, 1_000L);
+        SemanticBankSearchPanel panel = createPanelOnEdt();
+        List<Runnable> swingTasks = new ArrayList<>();
+        SemanticBankSearchPlugin plugin = new SemanticBankSearchPlugin();
+        plugin.setSearchComponentsForTesting(
+            index,
+            new SemanticCoverageAnalyzer(Collections.emptyList()),
+            panel,
+            null);
+        plugin.setThreadBridgeForTesting(new ThreadBridge(Runnable::run, swingTasks::add));
+        AtomicReference<Long> initialRevision = new AtomicReference<>();
+        runOnEdt(() -> initialRevision.set(panel.lastRenderedRevisionForTesting()));
+
+        plugin.showCoverageAuditForTesting();
+
+        assertEquals(1, swingTasks.size());
+        runOnEdt(() -> assertEquals(initialRevision.get().longValue(), panel.lastRenderedRevisionForTesting()));
+
+        runOnEdt(swingTasks.get(0));
+
+        runOnEdt(() -> assertEquals(1L, panel.lastRenderedRevisionForTesting()));
+    }
+
+    @Test
+    public void pluginPreservesRevisionsWhenSwingTasksRunOutOfOrder() throws Exception
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(300, "Barrows teleport", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+        index.record(301, "Prayer potion(4)", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+        SemanticBankSearchPanel panel = createPanelOnEdt();
+        List<Runnable> swingTasks = new ArrayList<>();
+        SemanticBankSearchPlugin plugin = new SemanticBankSearchPlugin();
+        plugin.setSearchComponentsForTesting(
+            index,
+            new SemanticCoverageAnalyzer(SemanticLibrary.create()),
+            new ReadinessAnalyzer(SemanticLibrary.create(), ReadinessPackLibrary.create()),
+            panel,
+            new RecordingOverlay(config(true)));
+        plugin.setThreadBridgeForTesting(new ThreadBridge(Runnable::run, swingTasks::add));
+
+        plugin.showCoverageAuditForTesting();
+        plugin.showReadinessForTesting("barrows trip");
+
+        assertEquals(2, swingTasks.size());
+        runOnEdt(swingTasks.get(1));
+        runOnEdt(swingTasks.get(0));
+
+        runOnEdt(() -> {
+            assertEquals(2L, panel.lastRenderedRevisionForTesting());
+            assertTrue(panel.currentStatusForTesting().startsWith("Readiness:"));
+        });
+    }
+
     private static SemanticBankSearchPlugin pluginWith(
         StorageIndex index,
         ObservedStorageScanner scanner,
@@ -174,6 +234,23 @@ public class SemanticBankSearchPluginTest
         plugin.setObservedStorageLifecycleStateForTesting(index, scanner, config);
         plugin.setObservedStoragePersistenceForTesting(ignored -> { });
         return plugin;
+    }
+
+    private static SemanticBankSearchPanel createPanelOnEdt() throws Exception
+    {
+        AtomicReference<SemanticBankSearchPanel> panel = new AtomicReference<>();
+        runOnEdt(() -> panel.set(new SemanticBankSearchPanel(ignored -> { }, () -> { }, () -> { })));
+        return panel.get();
+    }
+
+    private static void runOnEdt(Runnable runnable) throws Exception
+    {
+        if (SwingUtilities.isEventDispatchThread())
+        {
+            runnable.run();
+            return;
+        }
+        SwingUtilities.invokeAndWait(runnable);
     }
 
     private static ObservedStorageScanner noVisibleStorageScanner()

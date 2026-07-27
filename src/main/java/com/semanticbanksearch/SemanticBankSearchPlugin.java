@@ -24,6 +24,7 @@ import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ScriptCallbackEvent;
 import net.runelite.api.widgets.ComponentID;
 import net.runelite.api.widgets.Widget;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemEquipmentStats;
@@ -78,6 +79,9 @@ public class SemanticBankSearchPlugin extends Plugin
 	private ClientToolbar clientToolbar;
 
 	@Inject
+	private ClientThread clientThread;
+
+	@Inject
 	private ConfigManager configManager;
 
 	@Inject
@@ -105,6 +109,7 @@ public class SemanticBankSearchPlugin extends Plugin
 	private ObservedStorageScanner storageScanner;
 	private final Set<String> visibleStorageSourceKeys = new HashSet<>();
 	private SemanticBankSearchPanel panel;
+	private ThreadBridge threadBridge;
 	private SemanticBankSearchOverlay overlay;
 	private NavigationButton navigationButton;
 	private String currentQuery = "";
@@ -123,6 +128,7 @@ public class SemanticBankSearchPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
+		threadBridge = ThreadBridge.runtime(clientThread);
 		index = SemanticBankSearchStorage.deserialize(
 			gson,
 			configManager.getConfiguration(SemanticBankSearchConfig.GROUP, STORAGE_KEY));
@@ -168,6 +174,7 @@ public class SemanticBankSearchPlugin extends Plugin
 
 		setViewState(PanelMode.SEARCH, "");
 		panel = null;
+		threadBridge = null;
 		overlay = null;
 		engine = null;
 		bankFilter = null;
@@ -265,7 +272,7 @@ public class SemanticBankSearchPlugin extends Plugin
 			}
 			if (panel != null)
 			{
-				panel.clearResults();
+				publishPanelSnapshot(PanelViewSnapshot.clear(revision));
 			}
 		}
 	}
@@ -344,7 +351,7 @@ public class SemanticBankSearchPlugin extends Plugin
 			{
 				return;
 			}
-			panel.updateIndexedItems(items, indexedStatus(items));
+			publishPanelSnapshot(PanelViewSnapshot.allIndexed(revision, items, indexedStatus(items)));
 		}
 	}
 
@@ -362,7 +369,7 @@ public class SemanticBankSearchPlugin extends Plugin
 			{
 				return;
 			}
-			panel.updateCoverageAudit(results, coverageStatus(results));
+			publishPanelSnapshot(PanelViewSnapshot.coverageAudit(revision, results, coverageStatus(results)));
 		}
 	}
 
@@ -382,7 +389,7 @@ public class SemanticBankSearchPlugin extends Plugin
 				return;
 			}
 			overlay.setHighlightedItemIds(highlightedItemIds);
-			panel.updateReadiness(result, readinessStatus(result));
+			publishPanelSnapshot(PanelViewSnapshot.readiness(revision, query, result, readinessStatus(result)));
 		}
 	}
 	private void refreshCurrentSearch(String query, long revision)
@@ -410,10 +417,21 @@ public class SemanticBankSearchPlugin extends Plugin
 				return;
 			}
 			overlay.setHighlightedItemIds(highlightedItemIds);
-			panel.updateResults(query, results, statusText(results));
+			publishPanelSnapshot(PanelViewSnapshot.search(revision, query, results, statusText(results)));
 		}
 	}
 
+
+	private void publishPanelSnapshot(PanelViewSnapshot snapshot)
+	{
+		ThreadBridge bridge = threadBridge;
+		SemanticBankSearchPanel targetPanel = panel;
+		if (bridge == null || targetPanel == null || snapshot == null)
+		{
+			return;
+		}
+		bridge.submitSwing(() -> targetPanel.applySnapshot(snapshot));
+	}
 
 	private List<SemanticSearchResult> relativeRankingResults(String query)
 	{
@@ -602,6 +620,11 @@ public class SemanticBankSearchPlugin extends Plugin
 		this.readinessAnalyzer = readinessAnalyzer;
 		this.panel = panel;
 		this.overlay = overlay;
+	}
+
+	void setThreadBridgeForTesting(ThreadBridge threadBridge)
+	{
+		this.threadBridge = threadBridge;
 	}
 
 	void showCoverageAuditForTesting()

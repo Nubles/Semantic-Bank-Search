@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.AbstractButton;
 import javax.swing.JLabel;
 import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import org.junit.Test;
 
@@ -154,7 +155,7 @@ public class SemanticBankSearchPanelTest
     }
 
     @Test
-    public void clearButtonEmitsCommandWithoutRenderingLocally() throws Exception
+    public void clearButtonWaitsForAuthoritativeSnapshotToClearQueryAndResults() throws Exception
     {
         AtomicInteger clearCommands = new AtomicInteger();
         SemanticBankSearchPanel panel = new SemanticBankSearchPanel(
@@ -170,13 +171,23 @@ public class SemanticBankSearchPanelTest
                     result("Prayer potion(4)", "Prayer restoration"),
                     result("Super restore(4)", "Prayer restoration")),
                 "Authoritative status"));
+            JTextField searchField = findTextField(panel);
+            searchField.setText("prayer");
 
             findButton(panel, "Clear").doClick();
 
             assertEquals(1, clearCommands.get());
+            assertEquals("prayer", searchField.getText());
             assertEquals(7L, panel.lastRenderedRevisionForTesting());
             assertEquals(2, panel.currentResultCountForTesting());
             assertEquals("Authoritative status", panel.currentStatusForTesting());
+
+            panel.applySnapshot(PanelViewSnapshot.clear(8L, "Authoritative clear"));
+
+            assertEquals("", searchField.getText());
+            assertEquals(8L, panel.lastRenderedRevisionForTesting());
+            assertEquals(1, panel.currentResultCountForTesting());
+            assertEquals("Authoritative clear", panel.currentStatusForTesting());
         });
     }
 
@@ -286,6 +297,26 @@ public class SemanticBankSearchPanelTest
                 if (button != null)
                 {
                     return button;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static JTextField findTextField(Container container)
+    {
+        for (Component component : container.getComponents())
+        {
+            if (component instanceof JTextField)
+            {
+                return (JTextField) component;
+            }
+            if (component instanceof Container)
+            {
+                JTextField field = findTextField((Container) component);
+                if (field != null)
+                {
+                    return field;
                 }
             }
         }

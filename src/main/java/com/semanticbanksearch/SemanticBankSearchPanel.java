@@ -6,7 +6,6 @@ import java.awt.Font;
 import java.awt.GridLayout;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -43,7 +42,6 @@ public class SemanticBankSearchPanel extends PluginPanel
 	private final JLabel summaryLabel = new JLabel(" ");
 	private final JLabel statusLabel = new JLabel(" ");
 	private final JTextField searchField = new JTextField();
-	private final AtomicLong compatibilityRevision = new AtomicLong();
 	private long lastRenderedRevision = Long.MIN_VALUE;
 
 	public SemanticBankSearchPanel(Consumer<String> searchConsumer, Runnable allIndexedConsumer, Runnable clearConsumer)
@@ -96,7 +94,15 @@ public class SemanticBankSearchPanel extends PluginPanel
 		add(statusLabel, BorderLayout.SOUTH);
 
 		searchField.addActionListener(event -> runSearch(searchField.getText()));
-		clearResults();
+		PanelViewSnapshot initialSnapshot = PanelViewSnapshot.clear(0L);
+		if (SwingUtilities.isEventDispatchThread())
+		{
+			applySnapshot(initialSnapshot);
+		}
+		else
+		{
+			SwingUtilities.invokeLater(() -> applySnapshot(initialSnapshot));
+		}
 	}
 
 	public void applySnapshot(PanelViewSnapshot snapshot)
@@ -131,50 +137,6 @@ public class SemanticBankSearchPanel extends PluginPanel
 			default:
 				throw new IllegalArgumentException("Unsupported panel snapshot kind: " + snapshot.getKind());
 		}
-	}
-
-	void updateResults(String query, List<SemanticSearchResult> results, String status)
-	{
-		submitCompatibilitySnapshot(PanelViewSnapshot.search(
-			nextCompatibilityRevision(), query, results, status));
-	}
-
-	void updateIndexedItems(List<ObservedItem> items, String status)
-	{
-		submitCompatibilitySnapshot(PanelViewSnapshot.allIndexed(
-			nextCompatibilityRevision(), items, status));
-	}
-
-	void updateCoverageAudit(List<SemanticCoverageResult> results, String status)
-	{
-		submitCompatibilitySnapshot(PanelViewSnapshot.coverageAudit(
-			nextCompatibilityRevision(), results, status));
-	}
-
-	void updateReadiness(ReadinessResult result, String status)
-	{
-		submitCompatibilitySnapshot(PanelViewSnapshot.readiness(
-			nextCompatibilityRevision(), "", result, status));
-	}
-
-	void clearResults()
-	{
-		submitCompatibilitySnapshot(PanelViewSnapshot.clear(nextCompatibilityRevision()));
-	}
-
-	private long nextCompatibilityRevision()
-	{
-		return compatibilityRevision.incrementAndGet();
-	}
-
-	private void submitCompatibilitySnapshot(PanelViewSnapshot snapshot)
-	{
-		if (SwingUtilities.isEventDispatchThread())
-		{
-			applySnapshot(snapshot);
-			return;
-		}
-		SwingUtilities.invokeLater(() -> applySnapshot(snapshot));
 	}
 
 	private void renderResults(List<SemanticSearchResult> results, String status)
@@ -328,6 +290,7 @@ public class SemanticBankSearchPanel extends PluginPanel
 
 	private void renderClearResults(String status)
 	{
+		searchField.setText("");
 		resultsContainer.removeAll();
 		summaryLabel.setText("Ready to search");
 		statusLabel.setText(status.trim().isEmpty() ? " " : status.trim());
@@ -399,10 +362,7 @@ public class SemanticBankSearchPanel extends PluginPanel
 
 		JButton clearButton = new JButton("Clear");
 		clearButton.setFocusable(false);
-		clearButton.addActionListener(event -> {
-			searchField.setText("");
-			clearConsumer.run();
-		});
+		clearButton.addActionListener(event -> clearConsumer.run());
 		buttons.add(clearButton);
 
 		controls.add(buttons, BorderLayout.SOUTH);

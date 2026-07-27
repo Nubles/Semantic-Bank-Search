@@ -5,8 +5,8 @@ import java.awt.Color;
 import java.awt.Font;
 import java.awt.GridLayout;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -43,7 +43,8 @@ public class SemanticBankSearchPanel extends PluginPanel
 	private final JLabel summaryLabel = new JLabel(" ");
 	private final JLabel statusLabel = new JLabel(" ");
 	private final JTextField searchField = new JTextField();
-	private int renderSequence;
+	private final AtomicLong compatibilityRevision = new AtomicLong();
+	private long lastRenderedRevision = Long.MIN_VALUE;
 
 	public SemanticBankSearchPanel(Consumer<String> searchConsumer, Runnable allIndexedConsumer, Runnable clearConsumer)
 	{
@@ -98,80 +99,86 @@ public class SemanticBankSearchPanel extends PluginPanel
 		clearResults();
 	}
 
-	public void updateResults(String query, List<SemanticSearchResult> results, String status)
+	public void applySnapshot(PanelViewSnapshot snapshot)
 	{
-		int sequence = nextRenderSequence();
-		List<SemanticSearchResult> safeResults = results == null ? Collections.emptyList() : new ArrayList<>(results);
-		String safeStatus = status == null ? "" : status;
 		if (!SwingUtilities.isEventDispatchThread())
 		{
-			SwingUtilities.invokeLater(() -> renderResults(sequence, safeResults, safeStatus));
-			return;
+			throw new IllegalStateException("Panel snapshots must be applied on the Swing event dispatch thread");
 		}
-
-		renderResults(sequence, safeResults, safeStatus);
-	}
-
-	public void updateIndexedItems(List<ObservedItem> items, String status)
-	{
-		int sequence = nextRenderSequence();
-		List<ObservedItem> safeItems = copyObservedItems(items);
-		String safeStatus = status == null ? "" : status;
-		if (!SwingUtilities.isEventDispatchThread())
-		{
-			SwingUtilities.invokeLater(() -> renderIndexedItems(sequence, safeItems, safeStatus));
-			return;
-		}
-
-		renderIndexedItems(sequence, safeItems, safeStatus);
-	}
-
-	public void updateCoverageAudit(List<SemanticCoverageResult> results, String status)
-	{
-		int sequence = nextRenderSequence();
-		List<SemanticCoverageResult> safeResults = results == null ? Collections.emptyList() : new ArrayList<>(results);
-		String safeStatus = status == null ? "" : status;
-		if (!SwingUtilities.isEventDispatchThread())
-		{
-			SwingUtilities.invokeLater(() -> renderCoverageAudit(sequence, safeResults, safeStatus));
-			return;
-		}
-
-		renderCoverageAudit(sequence, safeResults, safeStatus);
-	}
-
-	public void updateReadiness(ReadinessResult result, String status)
-	{
-		int sequence = nextRenderSequence();
-		ReadinessResult safeResult = result == null ? ReadinessResult.unmatched("") : result;
-		String safeStatus = status == null ? "" : status;
-		if (!SwingUtilities.isEventDispatchThread())
-		{
-			SwingUtilities.invokeLater(() -> renderReadiness(sequence, safeResult, safeStatus));
-			return;
-		}
-
-		renderReadiness(sequence, safeResult, safeStatus);
-	}
-	public void clearResults()
-	{
-		int sequence = nextRenderSequence();
-		if (!SwingUtilities.isEventDispatchThread())
-		{
-			SwingUtilities.invokeLater(() -> renderClearResults(sequence));
-			return;
-		}
-
-		renderClearResults(sequence);
-	}
-
-	private void renderResults(int sequence, List<SemanticSearchResult> results, String status)
-	{
-		if (!isLatestRenderSequence(sequence))
+		if (snapshot == null || snapshot.getRevision() < lastRenderedRevision)
 		{
 			return;
 		}
 
+		lastRenderedRevision = snapshot.getRevision();
+		switch (snapshot.getKind())
+		{
+			case CLEAR:
+				renderClearResults(snapshot.getStatus());
+				break;
+			case SEARCH:
+				renderResults(snapshot.getSearchResults(), snapshot.getStatus());
+				break;
+			case ALL_INDEXED:
+				renderIndexedItems(snapshot.getIndexedItems(), snapshot.getStatus());
+				break;
+			case READINESS:
+				renderReadiness(snapshot.getReadinessResult(), snapshot.getStatus());
+				break;
+			case COVERAGE_AUDIT:
+				renderCoverageAudit(snapshot.getCoverageResults(), snapshot.getStatus());
+				break;
+			default:
+				throw new IllegalArgumentException("Unsupported panel snapshot kind: " + snapshot.getKind());
+		}
+	}
+
+	void updateResults(String query, List<SemanticSearchResult> results, String status)
+	{
+		submitCompatibilitySnapshot(PanelViewSnapshot.search(
+			nextCompatibilityRevision(), query, results, status));
+	}
+
+	void updateIndexedItems(List<ObservedItem> items, String status)
+	{
+		submitCompatibilitySnapshot(PanelViewSnapshot.allIndexed(
+			nextCompatibilityRevision(), items, status));
+	}
+
+	void updateCoverageAudit(List<SemanticCoverageResult> results, String status)
+	{
+		submitCompatibilitySnapshot(PanelViewSnapshot.coverageAudit(
+			nextCompatibilityRevision(), results, status));
+	}
+
+	void updateReadiness(ReadinessResult result, String status)
+	{
+		submitCompatibilitySnapshot(PanelViewSnapshot.readiness(
+			nextCompatibilityRevision(), "", result, status));
+	}
+
+	void clearResults()
+	{
+		submitCompatibilitySnapshot(PanelViewSnapshot.clear(nextCompatibilityRevision()));
+	}
+
+	private long nextCompatibilityRevision()
+	{
+		return compatibilityRevision.incrementAndGet();
+	}
+
+	private void submitCompatibilitySnapshot(PanelViewSnapshot snapshot)
+	{
+		if (SwingUtilities.isEventDispatchThread())
+		{
+			applySnapshot(snapshot);
+			return;
+		}
+		SwingUtilities.invokeLater(() -> applySnapshot(snapshot));
+	}
+
+	private void renderResults(List<SemanticSearchResult> results, String status)
+	{
 		resultsContainer.removeAll();
 		summaryLabel.setText(matchSummary(results.size()));
 		statusLabel.setText(status.trim().isEmpty() ? " " : status.trim());
@@ -194,13 +201,8 @@ public class SemanticBankSearchPanel extends PluginPanel
 		repaint();
 	}
 
-	private void renderIndexedItems(int sequence, List<ObservedItem> items, String status)
+	private void renderIndexedItems(List<ObservedItem> items, String status)
 	{
-		if (!isLatestRenderSequence(sequence))
-		{
-			return;
-		}
-
 		resultsContainer.removeAll();
 		summaryLabel.setText(observedSummary(items.size()));
 		statusLabel.setText(status.trim().isEmpty() ? " " : status.trim());
@@ -223,13 +225,8 @@ public class SemanticBankSearchPanel extends PluginPanel
 		repaint();
 	}
 
-	private void renderCoverageAudit(int sequence, List<SemanticCoverageResult> results, String status)
+	private void renderCoverageAudit(List<SemanticCoverageResult> results, String status)
 	{
-		if (!isLatestRenderSequence(sequence))
-		{
-			return;
-		}
-
 		resultsContainer.removeAll();
 		summaryLabel.setText(status.trim().isEmpty() ? observedSummary(results.size()) : status.trim());
 		statusLabel.setText(" ");
@@ -275,13 +272,8 @@ public class SemanticBankSearchPanel extends PluginPanel
 		repaint();
 	}
 
-	private void renderReadiness(int sequence, ReadinessResult result, String status)
+	private void renderReadiness(ReadinessResult result, String status)
 	{
-		if (!isLatestRenderSequence(sequence))
-		{
-			return;
-		}
-
 		resultsContainer.removeAll();
 		statusLabel.setText(status.trim().isEmpty() ? " " : status.trim());
 
@@ -333,16 +325,12 @@ public class SemanticBankSearchPanel extends PluginPanel
 		revalidate();
 		repaint();
 	}
-	private void renderClearResults(int sequence)
-	{
-		if (!isLatestRenderSequence(sequence))
-		{
-			return;
-		}
 
+	private void renderClearResults(String status)
+	{
 		resultsContainer.removeAll();
 		summaryLabel.setText("Ready to search");
-		statusLabel.setText(" ");
+		statusLabel.setText(status.trim().isEmpty() ? " " : status.trim());
 		resultsContainer.add(textBlock(
 			"Search your observed items",
 			"Type what you need, like poison protection or warm clothing, then press Enter."));
@@ -350,14 +338,19 @@ public class SemanticBankSearchPanel extends PluginPanel
 		repaint();
 	}
 
-	private synchronized int nextRenderSequence()
+	long lastRenderedRevisionForTesting()
 	{
-		return ++renderSequence;
+		return lastRenderedRevision;
 	}
 
-	private synchronized boolean isLatestRenderSequence(int sequence)
+	int currentResultCountForTesting()
 	{
-		return sequence == renderSequence;
+		return resultsContainer.getComponentCount();
+	}
+
+	String currentStatusForTesting()
+	{
+		return statusLabel.getText().trim();
 	}
 
 	private JPanel searchControls()
@@ -409,7 +402,6 @@ public class SemanticBankSearchPanel extends PluginPanel
 		clearButton.addActionListener(event -> {
 			searchField.setText("");
 			clearConsumer.run();
-			clearResults();
 		});
 		buttons.add(clearButton);
 
@@ -431,24 +423,6 @@ public class SemanticBankSearchPanel extends PluginPanel
 		panel.add(examples, BorderLayout.SOUTH);
 
 		return panel;
-	}
-
-	private static List<ObservedItem> copyObservedItems(List<ObservedItem> items)
-	{
-		List<ObservedItem> safeItems = new ArrayList<>();
-		if (items == null)
-		{
-			return safeItems;
-		}
-
-		for (ObservedItem item : items)
-		{
-			if (item != null)
-			{
-				safeItems.add(item);
-			}
-		}
-		return safeItems;
 	}
 
 	private void runSearch(String query)

@@ -17,7 +17,7 @@ public class SemanticBankSearchOverlay extends WidgetItemOverlay
 	private static final Color BORDER_COLOR = new Color(0, 190, 255, 220);
 
 	private final SemanticBankSearchConfig config;
-	private Set<Integer> highlightedItemIds = Collections.emptySet();
+	private volatile Set<Integer> highlightedItemIds = Collections.emptySet();
 
 	public SemanticBankSearchOverlay(SemanticBankSearchConfig config)
 	{
@@ -33,7 +33,7 @@ public class SemanticBankSearchOverlay extends WidgetItemOverlay
 			return;
 		}
 
-		highlightedItemIds = new HashSet<>(itemIds);
+		highlightedItemIds = Collections.unmodifiableSet(new HashSet<>(itemIds));
 	}
 
 	@Override

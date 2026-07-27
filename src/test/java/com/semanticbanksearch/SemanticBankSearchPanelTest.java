@@ -1,6 +1,8 @@
 package com.semanticbanksearch;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.awt.Component;
@@ -9,6 +11,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.AbstractButton;
 import javax.swing.JLabel;
 import javax.swing.JTextArea;
@@ -22,11 +26,15 @@ public class SemanticBankSearchPanelTest
     {
         SemanticBankSearchPanel panel = new SemanticBankSearchPanel(ignored -> { }, () -> { }, ignored -> { }, () -> { }, () -> { });
 
-        runOnEdt(() -> panel.updateResults("prayer", Arrays.asList(
-            result("Prayer potion(4)", "Prayer restoration"),
-            result("Super restore(4)", "Prayer restoration")), ""));
+        runOnEdt(() -> panel.applySnapshot(PanelViewSnapshot.search(
+            1L,
+            "prayer",
+            Arrays.asList(
+                result("Prayer potion(4)", "Prayer restoration"),
+                result("Super restore(4)", "Prayer restoration")),
+            "")));
 
-        List<String> text = visibleText(panel);
+        List<String> text = visibleTextOnEdt(panel);
         assertTrue(text.contains("Search"));
         assertTrue(text.contains("All"));
         assertTrue(text.contains("Readiness"));
@@ -41,12 +49,14 @@ public class SemanticBankSearchPanelTest
     {
         SemanticBankSearchPanel panel = new SemanticBankSearchPanel(ignored -> { }, () -> { }, ignored -> { }, () -> { }, () -> { });
 
-        runOnEdt(() -> panel.updateCoverageAudit(Arrays.asList(
-            coverage("Prayer potion(4)", Collections.singletonList("Prayer restoration")),
-            coverage("Coins", Collections.emptyList())),
-            "Covered 1 of 2 observed items."));
+        runOnEdt(() -> panel.applySnapshot(PanelViewSnapshot.coverageAudit(
+            1L,
+            Arrays.asList(
+                coverage("Prayer potion(4)", Collections.singletonList("Prayer restoration")),
+                coverage("Coins", Collections.emptyList())),
+            "Covered 1 of 2 observed items.")));
 
-        List<String> text = visibleText(panel);
+        List<String> text = visibleTextOnEdt(panel);
         assertTrue(text.contains("Covered 1 of 2 observed items."));
         assertTrue(text.contains("Uncovered"));
         assertTrue(text.contains("Covered"));
@@ -69,9 +79,13 @@ public class SemanticBankSearchPanelTest
                 readinessSlot("Spade", ReadinessSlotKind.REQUIRED, Collections.emptyList())),
             true);
 
-        runOnEdt(() -> panel.updateReadiness(result, "Readiness: 1 of 2 required slots covered."));
+        runOnEdt(() -> panel.applySnapshot(PanelViewSnapshot.readiness(
+            1L,
+            "barrows trip",
+            result,
+            "Readiness: 1 of 2 required slots covered.")));
 
-        List<String> text = visibleText(panel);
+        List<String> text = visibleTextOnEdt(panel);
         assertTrue(text.contains("Readiness: Barrows trip"));
         assertTrue(text.contains("Owned"));
         assertTrue(text.contains("Missing"));
@@ -85,15 +99,87 @@ public class SemanticBankSearchPanelTest
     {
         SemanticBankSearchPanel panel = new SemanticBankSearchPanel(ignored -> { }, () -> { }, ignored -> { }, () -> { }, () -> { });
 
-        runOnEdt(() -> panel.updateCoverageAudit(Arrays.asList(
-            coverage("Uncut sapphire", Collections.emptyList(), Collections.singletonList("Gem"), ItemAwarenessStatus.MECHANICALLY_TAGGED),
-            coverage("Mystery item", Collections.emptyList(), Collections.emptyList(), ItemAwarenessStatus.UNKNOWN_OBSERVED)),
-            "Covered 0 of 2 observed items."));
+        runOnEdt(() -> panel.applySnapshot(PanelViewSnapshot.coverageAudit(
+            1L,
+            Arrays.asList(
+                coverage("Uncut sapphire", Collections.emptyList(), Collections.singletonList("Gem"), ItemAwarenessStatus.MECHANICALLY_TAGGED),
+                coverage("Mystery item", Collections.emptyList(), Collections.emptyList(), ItemAwarenessStatus.UNKNOWN_OBSERVED)),
+            "Covered 0 of 2 observed items.")));
 
-        List<String> text = visibleText(panel);
+        List<String> text = visibleTextOnEdt(panel);
         assertTrue(containsText(text, "Mechanical tags: Gem"));
         assertTrue(containsText(text, "Unknown observed item"));
     }
+
+    @Test
+    public void panelIgnoresOlderRevision() throws Exception
+    {
+        SemanticBankSearchPanel panel = new SemanticBankSearchPanel(ignored -> { }, () -> { }, () -> { });
+
+        runOnEdt(() -> {
+            panel.applySnapshot(PanelViewSnapshot.search(
+                2L,
+                "prayer",
+                Arrays.asList(
+                    result("Prayer potion(4)", "Prayer restoration"),
+                    result("Super restore(4)", "Prayer restoration")),
+                "Newest status"));
+            panel.applySnapshot(PanelViewSnapshot.clear(1L, "Stale status"));
+
+            assertEquals(2L, panel.lastRenderedRevisionForTesting());
+            assertEquals(2, panel.currentResultCountForTesting());
+            assertEquals("Newest status", panel.currentStatusForTesting());
+        });
+    }
+
+    @Test
+    public void panelAppliesSnapshotOnSwingEventThread() throws Exception
+    {
+        SemanticBankSearchPanel panel = new SemanticBankSearchPanel(ignored -> { }, () -> { }, () -> { });
+        PanelViewSnapshot snapshot = PanelViewSnapshot.search(
+            4L,
+            "prayer",
+            Collections.singletonList(result("Prayer potion(4)", "Prayer restoration")),
+            "Rendered on EDT");
+
+        assertThrows(IllegalStateException.class, () -> panel.applySnapshot(snapshot));
+
+        runOnEdt(() -> {
+            panel.applySnapshot(snapshot);
+
+            assertEquals(4L, panel.lastRenderedRevisionForTesting());
+            assertEquals(1, panel.currentResultCountForTesting());
+            assertEquals("Rendered on EDT", panel.currentStatusForTesting());
+        });
+    }
+
+    @Test
+    public void clearButtonEmitsCommandWithoutRenderingLocally() throws Exception
+    {
+        AtomicInteger clearCommands = new AtomicInteger();
+        SemanticBankSearchPanel panel = new SemanticBankSearchPanel(
+            ignored -> { },
+            () -> { },
+            clearCommands::incrementAndGet);
+
+        runOnEdt(() -> {
+            panel.applySnapshot(PanelViewSnapshot.search(
+                7L,
+                "prayer",
+                Arrays.asList(
+                    result("Prayer potion(4)", "Prayer restoration"),
+                    result("Super restore(4)", "Prayer restoration")),
+                "Authoritative status"));
+
+            findButton(panel, "Clear").doClick();
+
+            assertEquals(1, clearCommands.get());
+            assertEquals(7L, panel.lastRenderedRevisionForTesting());
+            assertEquals(2, panel.currentResultCountForTesting());
+            assertEquals("Authoritative status", panel.currentStatusForTesting());
+        });
+    }
+
     private static SemanticSearchResult result(String itemName, String category)
     {
         return new SemanticSearchResult(
@@ -149,6 +235,12 @@ public class SemanticBankSearchPanelTest
         SwingUtilities.invokeAndWait(runnable);
     }
 
+    private static List<String> visibleTextOnEdt(Container container) throws Exception
+    {
+        AtomicReference<List<String>> text = new AtomicReference<>();
+        runOnEdt(() -> text.set(visibleText(container)));
+        return text.get();
+    }
     private static List<String> visibleText(Container container)
     {
         List<String> text = new ArrayList<>();
@@ -178,6 +270,26 @@ public class SemanticBankSearchPanelTest
                 collectText(child, text);
             }
         }
+    }
+
+    private static AbstractButton findButton(Container container, String text)
+    {
+        for (Component component : container.getComponents())
+        {
+            if (component instanceof AbstractButton && text.equals(((AbstractButton) component).getText()))
+            {
+                return (AbstractButton) component;
+            }
+            if (component instanceof Container)
+            {
+                AbstractButton button = findButton((Container) component, text);
+                if (button != null)
+                {
+                    return button;
+                }
+            }
+        }
+        return null;
     }
 
     private static void addText(String value, List<String> text)

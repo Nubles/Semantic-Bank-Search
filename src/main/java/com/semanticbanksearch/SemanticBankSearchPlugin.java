@@ -504,11 +504,13 @@ public class SemanticBankSearchPlugin extends Plugin
 	void startObservedStorageLifecycle(long now)
 	{
 		boolean clearedVisibleStorage = markAllStorageSourcesNotVisible();
-		if (config != null && config.rememberObservedStorage())
+		boolean observingStorage = config != null && config.rememberObservedStorage();
+		if (observingStorage)
 		{
 			observeSafeStorage(now);
 		}
-		else if (clearedVisibleStorage)
+		boolean trimmedStorage = applyStorageRetentionPolicy();
+		if (trimmedStorage || (!observingStorage && clearedVisibleStorage))
 		{
 			persist(now);
 		}
@@ -525,22 +527,28 @@ public class SemanticBankSearchPlugin extends Plugin
 		{
 			Set<String> previouslyVisibleSourceKeys = new HashSet<>(visibleStorageSourceKeys);
 			boolean changed = observeSafeStorage(now);
+			boolean trimmedStorage = applyStorageRetentionPolicy();
 			boolean visibilityLost = !visibleStorageSourceKeys.containsAll(previouslyVisibleSourceKeys);
-			boolean shouldPersist = lastPersistMillis == 0L || now - lastPersistMillis >= SAVE_INTERVAL_MILLIS || visibilityLost;
+			boolean shouldPersist = trimmedStorage || lastPersistMillis == 0L || now - lastPersistMillis >= SAVE_INTERVAL_MILLIS || visibilityLost;
 			if (shouldPersist)
 			{
 				persist(now);
 			}
-			if (changed)
+			if (changed || trimmedStorage)
 			{
 				refreshActivePanelMode();
 			}
 			return shouldPersist;
 		}
 
-		if (!visibleStorageSourceKeys.isEmpty())
+		boolean hadVisibleStorage = !visibleStorageSourceKeys.isEmpty();
+		if (hadVisibleStorage)
 		{
 			markAllStorageSourcesNotVisible();
+		}
+		boolean trimmedStorage = applyStorageRetentionPolicy();
+		if (hadVisibleStorage || trimmedStorage)
+		{
 			refreshActivePanelMode();
 			persist(now);
 			return true;
@@ -647,8 +655,19 @@ public class SemanticBankSearchPlugin extends Plugin
 		}
 		visibleStorageSourceKeys.clear();
 		visibleStorageSourceKeys.addAll(currentlyVisibleSourceKeys);
-		new StorageRetentionPolicy(config.maximumRememberedEntries()).apply(index);
 		return changed;
+	}
+
+	private boolean applyStorageRetentionPolicy()
+	{
+		if (index == null || config == null)
+		{
+			return false;
+		}
+
+		int entriesBeforeTrim = index.items().size();
+		new StorageRetentionPolicy(config.maximumRememberedEntries()).apply(index);
+		return index.items().size() != entriesBeforeTrim;
 	}
 
 	private boolean markAllStorageSourcesNotVisible()

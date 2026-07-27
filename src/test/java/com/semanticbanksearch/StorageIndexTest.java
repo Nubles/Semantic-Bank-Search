@@ -139,6 +139,46 @@ public class StorageIndexTest
         assertEquals(itemIds(withoutSnapshot.items()), itemIds(withSnapshot.items()));
         assertEquals(Arrays.asList(2, 3), itemIds(withSnapshot.items()));
     }
+
+    @Test
+    public void evictsLowestItemIdWhenTimestampsMatch()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(2, "Later item ID", 1, StorageSourceType.BANK, "Bank", false, 1_000L);
+        index.record(1, "Earlier item ID", 1, StorageSourceType.BANK, "Bank", false, 1_000L);
+
+        index.trimToLimits(1, 1);
+
+        assertEquals(1, index.items().size());
+        assertEquals(2, index.items().get(0).getItemId());
+    }
+
+    @Test
+    public void evictsEarlierSourceTypeWhenTimestampsAndItemIdsMatch()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(1, "Bank item", 1, StorageSourceType.BANK, "Bank", false, 1_000L);
+        index.record(1, "Poh item", 1, StorageSourceType.POH_STORAGE, "Poh", false, 1_000L);
+
+        index.trimToLimits(1, 1);
+
+        assertEquals(1, index.items().size());
+        assertEquals(StorageSourceType.POH_STORAGE, index.items().get(0).getSourceType());
+    }
+
+    @Test
+    public void evictsCaseInsensitiveEarlierSourceNameWhenOtherFieldsMatch()
+    {
+        StorageIndex index = new StorageIndex();
+        index.record(1, "Zulu source", 1, StorageSourceType.OTHER_STORAGE, "zulu", false, 1_000L);
+        index.record(1, "Alpha source", 1, StorageSourceType.OTHER_STORAGE, "Alpha", false, 1_000L);
+
+        index.trimToLimits(1, 1);
+
+        assertEquals(1, index.items().size());
+        assertEquals("zulu", index.items().get(0).getSourceName());
+    }
+
     @Test
 
     public void nonBankSourceItemsBecomeRememberedWhenSourceCloses()

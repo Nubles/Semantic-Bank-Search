@@ -89,6 +89,24 @@ public class SemanticBankSearchPluginTest
     }
 
     @Test
+    public void startupWithRememberingDisabledTrimsOversizedIndexAndPersists()
+    {
+        StorageIndex index = new StorageIndex();
+        for (int itemId = 1; itemId <= 801; itemId++)
+        {
+            index.record(itemId, "Item " + itemId, 1, StorageSourceType.BANK, "Bank", false, itemId);
+        }
+        AtomicInteger persistCount = new AtomicInteger();
+        SemanticBankSearchPlugin plugin = pluginWith(index, noVisibleStorageScanner(), config(false));
+        plugin.setObservedStoragePersistenceForTesting(ignored -> persistCount.incrementAndGet());
+
+        plugin.startObservedStorageLifecycle(2_000L);
+
+        assertEquals(800, index.items().size());
+        assertEquals(1, persistCount.get());
+    }
+
+    @Test
     public void coverageStatusCountsCoveredObservedItems()
     {
         SemanticBankSearchPlugin plugin = new SemanticBankSearchPlugin();

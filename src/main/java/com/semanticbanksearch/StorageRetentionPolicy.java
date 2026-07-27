@@ -1,6 +1,6 @@
 package com.semanticbanksearch;
 
-final class StorageRetentionPolicy
+public final class StorageRetentionPolicy
 {
     static final int DEFAULT_MAXIMUM_ENTRIES = 5_000;
     static final int HARD_MAXIMUM_ENTRIES = 20_000;
@@ -8,7 +8,7 @@ final class StorageRetentionPolicy
 
     private final int maximumEntries;
 
-    StorageRetentionPolicy(int configuredMaximumEntries)
+    public StorageRetentionPolicy(int configuredMaximumEntries)
     {
         this(configuredMaximumEntries, HARD_MAXIMUM_ENTRIES);
     }

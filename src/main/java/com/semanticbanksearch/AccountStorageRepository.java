@@ -30,8 +30,14 @@ final class AccountStorageRepository
 
     AccountStorageLoadResult load(AccountKey accountKey, IntFunction<String> itemNameResolver) throws IOException
     {
+        Path storageDirectory = runeLiteDirectory.resolve("semantic-bank-search");
+        if (Files.exists(storageDirectory) && !Files.isDirectory(storageDirectory))
+        {
+            throw new IOException("Semantic bank search storage path is not a directory");
+        }
+
         Path indexPath = indexPath(accountKey);
-        if (!Files.exists(indexPath))
+        if (Files.notExists(indexPath))
         {
             return new AccountStorageLoadResult(new StorageIndex(), null);
         }

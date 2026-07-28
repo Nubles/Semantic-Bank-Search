@@ -6,6 +6,7 @@ import com.google.gson.JsonParser;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.CopyOption;
 import java.nio.file.FileVisitResult;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -23,12 +24,54 @@ final class AccountStorageRepository
     private final Path runeLiteDirectory;
     private final Gson gson;
     private final Clock clock;
+    private final FileOperations fileOperations;
+
+    interface FileOperations
+    {
+        String readString(Path path) throws IOException;
+        void writeString(Path path, String value) throws IOException;
+        void move(Path source, Path target, CopyOption... options) throws IOException;
+        void deleteIfExists(Path path) throws IOException;
+    }
+
+    private static final class NioFileOperations implements FileOperations
+    {
+        @Override
+        public String readString(Path path) throws IOException
+        {
+            return Files.readString(path, StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public void writeString(Path path, String value) throws IOException
+        {
+            Files.writeString(path, value, StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public void move(Path source, Path target, CopyOption... options) throws IOException
+        {
+            Files.move(source, target, options);
+        }
+
+        @Override
+        public void deleteIfExists(Path path) throws IOException
+        {
+            Files.deleteIfExists(path);
+        }
+    }
 
     AccountStorageRepository(Path runeLiteDirectory, Gson gson, Clock clock)
+    {
+        this(runeLiteDirectory, gson, clock, new NioFileOperations());
+    }
+
+    AccountStorageRepository(Path runeLiteDirectory, Gson gson, Clock clock, FileOperations fileOperations)
     {
         this.runeLiteDirectory = Objects.requireNonNull(runeLiteDirectory);
         this.gson = Objects.requireNonNull(gson);
         this.clock = Objects.requireNonNull(clock);
+        this.fileOperations = Objects.requireNonNull(fileOperations);
     }
 
     AccountStorageLoadResult load(AccountKey accountKey, IntFunction<String> itemNameResolver) throws IOException
@@ -46,7 +89,7 @@ final class AccountStorageRepository
         }
         try
         {
-            JsonElement root = JsonParser.parseString(Files.readString(indexPath, StandardCharsets.UTF_8));
+            JsonElement root = JsonParser.parseString(fileOperations.readString(indexPath));
             if (!root.isJsonObject())
             {
                 return quarantined(indexPath);
@@ -72,19 +115,19 @@ final class AccountStorageRepository
         Files.createDirectories(directory);
         try
         {
-            Files.writeString(temporaryPath, gson.toJson(SemanticBankSearchStorage.toDocument(index)), StandardCharsets.UTF_8);
+            fileOperations.writeString(temporaryPath, gson.toJson(SemanticBankSearchStorage.toDocument(index)));
             try
             {
-                Files.move(temporaryPath, indexPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                fileOperations.move(temporaryPath, indexPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             }
             catch (AtomicMoveNotSupportedException ex)
             {
-                Files.move(temporaryPath, indexPath, StandardCopyOption.REPLACE_EXISTING);
+                fileOperations.move(temporaryPath, indexPath, StandardCopyOption.REPLACE_EXISTING);
             }
         }
         finally
         {
-            Files.deleteIfExists(temporaryPath);
+            fileOperations.deleteIfExists(temporaryPath);
         }
     }
 

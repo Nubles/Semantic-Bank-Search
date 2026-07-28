@@ -912,4 +912,3 @@ If no correction was needed, do not create an empty commit.
 - Panel commands run through `ClientThread`; panel renders run through Swing EDT
   with stale revision rejection.
 - Full clean tests, privacy scan, runtime safety scan, and whitespace checks pass.
-

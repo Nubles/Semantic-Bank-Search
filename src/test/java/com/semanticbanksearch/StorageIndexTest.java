@@ -179,6 +179,40 @@ public class StorageIndexTest
         assertEquals("zulu", index.items().get(0).getSourceName());
     }
 
+    @Test(timeout = 15_000L)
+    public void recordsUpdatesAndTrimsTwentyThousandEntriesWithinGenerousBudget()
+    {
+        StorageIndex index = new StorageIndex();
+        for (int itemId = 1; itemId <= 20_000; itemId++)
+        {
+            index.record(
+                itemId,
+                "Item " + itemId,
+                1,
+                StorageSourceType.BANK,
+                "Bank",
+                false,
+                itemId);
+        }
+        for (int itemId = 20_000; itemId >= 1; itemId--)
+        {
+            index.record(
+                itemId,
+                "Updated item " + itemId,
+                2,
+                StorageSourceType.BANK,
+                "Bank",
+                false,
+                itemId);
+        }
+
+        assertEquals(20_000, index.items().size());
+        index.trimToLimits(10_000, 10_000);
+        assertEquals(10_000, index.items().size());
+        assertEquals(10_001, index.items().get(0).getItemId());
+        assertEquals(2, index.items().get(0).getQuantity());
+    }
+
     @Test
 
     public void nonBankSourceItemsBecomeRememberedWhenSourceCloses()

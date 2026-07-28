@@ -10,6 +10,7 @@ import static org.junit.Assert.assertTrue;
 import com.google.gson.Gson;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.CopyOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -155,6 +156,87 @@ public class AccountSessionControllerTest
         assertFalse(containsItem(update.getActiveIndex(), 101));
     }
 
+    @Test public void transientReadFailureRecoversAndMergesNewestObservationsBeforeSave() throws IOException
+    {
+        StorageIndex diskIndex = new StorageIndex();
+        diskIndex.record(101, "Disk only", 1, StorageSourceType.BANK, "Bank", false, 100L);
+        diskIndex.record(102, "Disk newer", 12, StorageSourceType.BANK, "Bank", false, 300L);
+        diskIndex.record(103, "Disk older", 13, StorageSourceType.BANK, "Bank", false, 100L);
+        diskIndex.record(104, "Disk tie", 14, StorageSourceType.BANK, "Bank", false, 500L);
+        repository().save(key(101L), diskIndex);
+        ReadFailingFileOperations operations = new ReadFailingFileOperations(1);
+        AccountSessionController controller = new AccountSessionController(
+            repository(operations),
+            this::itemName,
+            new StorageRetentionPolicy(100, 100));
+
+        AccountSessionUpdate update = controller.switchTo(101L);
+        assertTrue(update.getNotices().contains(LOAD_FAILURE_NOTICE));
+        StorageIndex sessionIndex = update.getActiveIndex();
+        sessionIndex.record(102, "Session older", 22, StorageSourceType.BANK, "Bank", true, 200L);
+        sessionIndex.record(103, "Session newer", 23, StorageSourceType.BANK, "Bank", true, 400L);
+        sessionIndex.record(104, "Session tie", 24, StorageSourceType.BANK, "Bank", true, 500L);
+        sessionIndex.record(105, "Session only", 25, StorageSourceType.BANK, "Bank", true, 600L);
+
+        assertEquals(Optional.empty(), controller.persist());
+
+        assertSame(sessionIndex, controller.activeIndexOrNull());
+        StorageIndex recovered = repository().load(key(101L), this::itemName).index();
+        assertEquals(1, itemById(recovered, 101).getQuantity());
+        assertEquals(12, itemById(recovered, 102).getQuantity());
+        assertEquals(23, itemById(recovered, 103).getQuantity());
+        assertEquals(24, itemById(recovered, 104).getQuantity());
+        assertEquals(25, itemById(recovered, 105).getQuantity());
+        assertEquals(2, operations.readAttempts);
+        assertEquals(1, operations.writeAttempts);
+
+        assertEquals(Optional.empty(), controller.persist());
+        assertEquals(2, operations.readAttempts);
+        assertEquals(2, operations.writeAttempts);
+    }
+
+    @Test public void persistentReadFailureNeverOverwritesUnreadableIndex() throws IOException
+    {
+        repository().save(key(101L), index(101, "Valid disk item", 7));
+        String originalJson = Files.readString(path(key(101L)), StandardCharsets.UTF_8);
+        ReadFailingFileOperations operations = new ReadFailingFileOperations(Integer.MAX_VALUE);
+        AccountSessionController controller = controller(repository(operations));
+        StorageIndex sessionIndex = controller.switchTo(101L).getActiveIndex();
+        sessionIndex.record(202, "Session item", 2, StorageSourceType.BANK, "Bank", true, 2L);
+
+        assertEquals(Optional.of(SAVE_FAILURE_NOTICE), controller.persist());
+        assertEquals(Optional.of(SAVE_FAILURE_NOTICE), controller.persist());
+
+        assertEquals(originalJson, Files.readString(path(key(101L)), StandardCharsets.UTF_8));
+        assertEquals(3, operations.readAttempts);
+        assertEquals(0, operations.writeAttempts);
+    }
+
+    @Test public void deliberateClearResetsReadFailureSaveGuard() throws IOException
+    {
+        repository().save(key(101L), index(101, "Valid disk item", 7));
+        ReadFailingFileOperations operations = new ReadFailingFileOperations(Integer.MAX_VALUE);
+        AccountSessionController controller = controller(repository(operations));
+        AccountSessionUpdate update = controller.switchTo(101L);
+        assertTrue(update.getNotices().contains(LOAD_FAILURE_NOTICE));
+
+        assertEquals(Optional.of(CLEARED_NOTICE), controller.clearActiveAccount());
+        int readsAfterClear = operations.readAttempts;
+        controller.activeIndexOrNull().record(
+            202,
+            "Fresh item",
+            2,
+            StorageSourceType.BANK,
+            "Bank",
+            true,
+            2L);
+
+        assertEquals(Optional.empty(), controller.persist());
+        assertEquals(readsAfterClear, operations.readAttempts);
+        assertEquals(1, operations.writeAttempts);
+        assertTrue(containsItem(repository().load(key(101L), this::itemName).index(), 202));
+    }
+
     @Test public void clearActiveAccountDeletesDiskAndMemoryState() throws IOException
     {
         AccountSessionController controller = controller();
@@ -200,6 +282,15 @@ public class AccountSessionControllerTest
             temporaryFolder.getRoot().toPath(),
             new Gson(),
             Clock.fixed(Instant.ofEpochMilli(FIXED_MILLIS), ZoneOffset.UTC));
+    }
+
+    private AccountStorageRepository repository(AccountStorageRepository.FileOperations operations)
+    {
+        return new AccountStorageRepository(
+            temporaryFolder.getRoot().toPath(),
+            new Gson(),
+            Clock.fixed(Instant.ofEpochMilli(FIXED_MILLIS), ZoneOffset.UTC),
+            operations);
     }
 
     private Path path(AccountKey accountKey)
@@ -256,5 +347,60 @@ public class AccountSessionControllerTest
             }
         }
         return false;
+    }
+
+    private static ObservedItem itemById(StorageIndex index, int itemId)
+    {
+        for (ObservedItem item : index.items())
+        {
+            if (item.getItemId() == itemId)
+            {
+                return item;
+            }
+        }
+        throw new AssertionError("Missing item " + itemId);
+    }
+
+    private static final class ReadFailingFileOperations implements AccountStorageRepository.FileOperations
+    {
+        private int remainingReadFailures;
+        private int readAttempts;
+        private int writeAttempts;
+
+        private ReadFailingFileOperations(int remainingReadFailures)
+        {
+            this.remainingReadFailures = remainingReadFailures;
+        }
+
+        @Override
+        public String readString(Path path) throws IOException
+        {
+            readAttempts++;
+            if (remainingReadFailures > 0)
+            {
+                remainingReadFailures--;
+                throw new IOException("read failed");
+            }
+            return Files.readString(path, StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public void writeString(Path path, String value) throws IOException
+        {
+            writeAttempts++;
+            Files.writeString(path, value, StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public void move(Path source, Path target, CopyOption... options) throws IOException
+        {
+            Files.move(source, target, options);
+        }
+
+        @Override
+        public void deleteIfExists(Path path) throws IOException
+        {
+            Files.deleteIfExists(path);
+        }
     }
 }

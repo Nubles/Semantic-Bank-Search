@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
@@ -32,7 +34,39 @@ jobs:
         run: ./gradlew clean test
 
       - name: Check patch whitespace
-        run: git diff --check HEAD
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+          PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch || '' }}
+        run: |
+          set -euo pipefail
+          zero_sha="0000000000000000000000000000000000000000"
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            start_sha="$(git merge-base "$PR_BASE_SHA" HEAD)"
+            git diff --check "$start_sha" HEAD
+          elif [[ "$EVENT_NAME" == "push" && -n "$PUSH_BEFORE_SHA" && "$PUSH_BEFORE_SHA" != "$zero_sha" ]] \
+            && git cat-file -e "${PUSH_BEFORE_SHA}^{commit}" 2>/dev/null; then
+            git diff --check "$PUSH_BEFORE_SHA" HEAD
+          elif [[ -n "$DEFAULT_BRANCH" ]] \
+            && git cat-file -e "refs/remotes/origin/${DEFAULT_BRANCH}^{commit}" 2>/dev/null; then
+            start_sha="$(git merge-base "refs/remotes/origin/$DEFAULT_BRANCH" HEAD)"
+            git diff --check "$start_sha" HEAD
+          else
+            empty_tree="$(git hash-object -t tree /dev/null)"
+            git diff --check "$empty_tree" HEAD
+          fi
+
+      - name: Enforce account-index privacy
+        shell: bash
+        run: |
+          set -euo pipefail
+          if rg -n '\b(getConfiguration|setConfiguration)\b|semanticbanksearch\.index|\bSTORAGE_KEY\b' src/main/java/com/semanticbanksearch; then
+            echo "Observed bank indexes must not use ConfigManager; legacy unset cleanup remains permitted."
+            exit 1
+          fi
 
       - name: Enforce runtime safety contract
         shell: bash

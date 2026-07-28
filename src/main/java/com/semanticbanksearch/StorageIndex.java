@@ -2,10 +2,12 @@ package com.semanticbanksearch;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 public class StorageIndex
 {
@@ -16,11 +18,11 @@ public class StorageIndex
         .thenComparing(ObservedItem::getSourceType)
         .thenComparing(item -> item.getSourceName().toLowerCase(Locale.ROOT));
 
-    private List<ObservedItem> items = new ArrayList<>();
+    private Map<String, ObservedItem> itemsByKey = new LinkedHashMap<>();
 
     public List<ObservedItem> items()
     {
-        List<ObservedItem> orderedItems = new ArrayList<>(items);
+        List<ObservedItem> orderedItems = new ArrayList<>(itemsByKey.values());
         orderedItems.sort(Comparator.comparingLong(ObservedItem::getLastSeenMillis));
         List<ObservedItem> snapshots = new ArrayList<>();
         for (ObservedItem item : orderedItems)
@@ -53,16 +55,46 @@ public class StorageIndex
             currentlyVisible,
             lastSeenMillis);
 
-        for (ObservedItem existing : items)
+        String key = observed.key();
+        ObservedItem existing = itemsByKey.get(key);
+        if (existing != null)
         {
-            if (existing.key().equals(observed.key()))
-            {
-                existing.updateFrom(observed);
-                return;
-            }
+            existing.updateFrom(observed);
+            return;
         }
 
-        items.add(observed);
+        itemsByKey.put(key, observed);
+    }
+
+    void mergeRecovered(StorageIndex recovered)
+    {
+        if (recovered == null)
+        {
+            return;
+        }
+
+        Map<String, ObservedItem> sessionItems = itemsByKey;
+        Map<String, ObservedItem> mergedItems = new LinkedHashMap<>();
+        for (ObservedItem recoveredItem : recovered.itemsByKey.values())
+        {
+            ObservedItem recoveredCopy = new ObservedItem(recoveredItem);
+            mergedItems.put(recoveredCopy.key(), recoveredCopy);
+        }
+
+        for (ObservedItem sessionItem : sessionItems.values())
+        {
+            String key = sessionItem.key();
+            ObservedItem matchingItem = mergedItems.get(key);
+            if (matchingItem == null)
+            {
+                mergedItems.put(key, new ObservedItem(sessionItem));
+            }
+            else if (sessionItem.getLastSeenMillis() >= matchingItem.getLastSeenMillis())
+            {
+                matchingItem.updateFrom(sessionItem);
+            }
+        }
+        itemsByKey = mergedItems;
     }
 
     public void replaceVisibleSourceItems(
@@ -99,7 +131,7 @@ public class StorageIndex
         StorageSourceType normalizedSourceType = ObservedItem.normalizeSourceType(sourceType);
         String normalizedSourceName = sourceName == null ? "" : sourceName.trim();
 
-        for (ObservedItem item : items)
+        for (ObservedItem item : itemsByKey.values())
         {
             if (item.getSourceType() == normalizedSourceType && item.getSourceName().equals(normalizedSourceName))
             {
@@ -111,27 +143,46 @@ public class StorageIndex
     void trimToLimits(int maximumAccountEntries, int maximumEntriesPerSource)
     {
         Map<String, List<ObservedItem>> itemsBySource = new LinkedHashMap<>();
-        for (ObservedItem item : items)
+        for (ObservedItem item : itemsByKey.values())
         {
             String sourceKey = item.getSourceType() + "|" + item.getSourceName().toLowerCase(Locale.ROOT);
-            List<ObservedItem> sourceItems = itemsBySource.get(sourceKey);
-            if (sourceItems == null)
-            {
-                sourceItems = new ArrayList<>();
-                itemsBySource.put(sourceKey, sourceItems);
-            }
-            sourceItems.add(item);
+            itemsBySource.computeIfAbsent(sourceKey, ignored -> new ArrayList<>()).add(item);
         }
 
+        Set<String> removalKeys = new HashSet<>();
         for (List<ObservedItem> sourceItems : itemsBySource.values())
         {
-            trim(sourceItems, maximumEntriesPerSource);
+            markForRemoval(sourceItems, maximumEntriesPerSource, removalKeys);
         }
 
-        trim(new ArrayList<>(items), maximumAccountEntries);
+        List<ObservedItem> accountCandidates = new ArrayList<>();
+        for (Map.Entry<String, ObservedItem> entry : itemsByKey.entrySet())
+        {
+            if (!removalKeys.contains(entry.getKey()))
+            {
+                accountCandidates.add(entry.getValue());
+            }
+        }
+        markForRemoval(accountCandidates, maximumAccountEntries, removalKeys);
+
+        if (!removalKeys.isEmpty())
+        {
+            Map<String, ObservedItem> retainedItems = new LinkedHashMap<>();
+            for (Map.Entry<String, ObservedItem> entry : itemsByKey.entrySet())
+            {
+                if (!removalKeys.contains(entry.getKey()))
+                {
+                    retainedItems.put(entry.getKey(), entry.getValue());
+                }
+            }
+            itemsByKey = retainedItems;
+        }
     }
 
-    private void trim(List<ObservedItem> candidates, int maximumEntries)
+    private static void markForRemoval(
+        List<ObservedItem> candidates,
+        int maximumEntries,
+        Set<String> removalKeys)
     {
         int remainingEntriesToRemove = candidates.size() - maximumEntries;
         if (remainingEntriesToRemove <= 0)
@@ -147,7 +198,7 @@ public class StorageIndex
                 continue;
             }
 
-            items.remove(candidate);
+            removalKeys.add(candidate.key());
             remainingEntriesToRemove--;
             if (remainingEntriesToRemove == 0)
             {

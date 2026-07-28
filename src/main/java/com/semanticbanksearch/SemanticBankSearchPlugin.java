@@ -31,6 +31,7 @@ import net.runelite.api.widgets.Widget;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.RuneLite;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemEquipmentStats;
 import net.runelite.client.game.ItemManager;
@@ -54,6 +55,7 @@ public class SemanticBankSearchPlugin extends Plugin
 {
 	private static final long SAVE_INTERVAL_MILLIS = 60_000L;
 	private static final String LOGGED_OUT_STATUS = "Log in to use account-local storage.";
+	private static final String MAXIMUM_REMEMBERED_ENTRIES_KEY = "maximumRememberedEntries";
 
 	private enum PanelMode
 	{
@@ -123,8 +125,10 @@ public class SemanticBankSearchPlugin extends Plugin
 	private long viewRevision;
 	private boolean bankOpen;
 	private long lastPersistMillis;
+	private long lastPersistAttemptMillis;
 	private boolean persistenceRetryPending;
 	private String pendingStatusNotice = "";
+	private String lastPersistenceFailureNotice = "";
 
 	@Provides
 	SemanticBankSearchConfig provideConfig(ConfigManager configManager)
@@ -225,6 +229,29 @@ public class SemanticBankSearchPlugin extends Plugin
 		}
 	}
 
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event)
+	{
+		if (event == null
+			|| !SemanticBankSearchConfig.GROUP.equals(event.getGroup())
+			|| !MAXIMUM_REMEMBERED_ENTRIES_KEY.equals(event.getKey())
+			|| config == null
+			|| sessionController == null)
+		{
+			return;
+		}
+
+		boolean trimmed = sessionController.updateRetentionPolicy(
+			config.maximumRememberedEntries());
+		if (!trimmed)
+		{
+			return;
+		}
+
+		refreshActivePanelMode();
+		persist(System.currentTimeMillis());
+	}
+
 	void handleAccountHashChanged(long accountHash)
 	{
 		if (sessionController == null)
@@ -246,8 +273,7 @@ public class SemanticBankSearchPlugin extends Plugin
 
 		beginAccountTransition();
 		markAllStorageSourcesNotVisible();
-		long revision = setViewState(PanelMode.SEARCH, "");
-		clearOverlayHighlights();
+		publishAccountTransitionClear();
 		lastPersistMillis = 0L;
 
 		AccountSessionUpdate update = sessionController.switchTo(accountHash);
@@ -256,7 +282,11 @@ public class SemanticBankSearchPlugin extends Plugin
 		{
 			startObservedStorageLifecycle(System.currentTimeMillis());
 		}
-		publishPanelSnapshot(PanelViewSnapshot.clear(revision, latestNotice(update, "")));
+		long finalRevision = setViewState(PanelMode.SEARCH, "");
+		String finalStatus = lastPersistenceFailureNotice.isEmpty()
+			? latestNotice(update, "")
+			: lastPersistenceFailureNotice;
+		publishPanelSnapshot(PanelViewSnapshot.clear(finalRevision, finalStatus));
 	}
 
 	void handleGameStateChanged(GameState gameState, long accountHash)
@@ -276,16 +306,16 @@ public class SemanticBankSearchPlugin extends Plugin
 	{
 		beginAccountTransition();
 		markAllStorageSourcesNotVisible();
+		publishAccountTransitionClear();
 		AccountSessionUpdate update = sessionController == null
 			? null
 			: sessionController.deactivate();
 		index = null;
 		visibleStorageSourceKeys.clear();
 		lastPersistMillis = 0L;
-		long revision = setViewState(PanelMode.SEARCH, "");
-		clearOverlayHighlights();
+		long finalRevision = setViewState(PanelMode.SEARCH, "");
 		publishPanelSnapshot(PanelViewSnapshot.clear(
-			revision,
+			finalRevision,
 			latestNotice(update, LOGGED_OUT_STATUS)));
 	}
 
@@ -563,8 +593,17 @@ public class SemanticBankSearchPlugin extends Plugin
 	private void beginAccountTransition()
 	{
 		accountSessionEpoch.incrementAndGet();
+		lastPersistAttemptMillis = 0L;
 		persistenceRetryPending = false;
 		pendingStatusNotice = "";
+		lastPersistenceFailureNotice = "";
+	}
+
+	private void publishAccountTransitionClear()
+	{
+		long transitionRevision = setViewState(PanelMode.SEARCH, "");
+		clearOverlayHighlights();
+		publishPanelSnapshot(PanelViewSnapshot.clear(transitionRevision));
 	}
 
 	private String nextSnapshotStatus(String fallback)
@@ -684,14 +723,17 @@ public class SemanticBankSearchPlugin extends Plugin
 			boolean changed = observeSafeStorage(now);
 			boolean trimmedStorage = trimActiveIndex();
 			boolean visibilityLost = !visibleStorageSourceKeys.containsAll(previouslyVisibleSourceKeys);
-			boolean shouldPersist = persistenceRetryPending || trimmedStorage || lastPersistMillis == 0L || now - lastPersistMillis >= SAVE_INTERVAL_MILLIS || visibilityLost;
-			if (shouldPersist)
-			{
-				persist(now);
-			}
+			boolean scheduledPersistence = persistenceRetryPending
+				? persistenceRetryDue(now)
+				: lastPersistMillis == 0L || now - lastPersistMillis >= SAVE_INTERVAL_MILLIS;
+			boolean shouldPersist = trimmedStorage || visibilityLost || scheduledPersistence;
 			if (changed || trimmedStorage)
 			{
 				refreshActivePanelMode();
+			}
+			if (shouldPersist)
+			{
+				persist(now);
 			}
 			return shouldPersist;
 		}
@@ -702,13 +744,19 @@ public class SemanticBankSearchPlugin extends Plugin
 			markAllStorageSourcesNotVisible();
 		}
 		boolean trimmedStorage = trimActiveIndex();
-		if (persistenceRetryPending || hadVisibleStorage || trimmedStorage)
+		boolean scheduledRetry = persistenceRetryPending && persistenceRetryDue(now);
+		if (scheduledRetry || hadVisibleStorage || trimmedStorage)
 		{
 			refreshActivePanelMode();
 			persist(now);
 			return true;
 		}
 		return false;
+	}
+
+	private boolean persistenceRetryDue(long now)
+	{
+		return now - lastPersistAttemptMillis >= SAVE_INTERVAL_MILLIS;
 	}
 
 	void setObservedStorageLifecycleStateForTesting(
@@ -972,16 +1020,43 @@ public class SemanticBankSearchPlugin extends Plugin
 			return;
 		}
 
+		lastPersistAttemptMillis = persistedAtMillis;
 		String failureNotice = sessionController.persist().orElse("");
 		if (!failureNotice.isEmpty())
 		{
+			lastPersistenceFailureNotice = failureNotice;
+			boolean firstFailure = !persistenceRetryPending;
 			persistenceRetryPending = true;
-			pendingStatusNotice = failureNotice;
+			if (firstFailure)
+			{
+				publishPersistenceFailureNotice(failureNotice);
+			}
 			return;
 		}
 
 		persistenceRetryPending = false;
+		pendingStatusNotice = "";
+		lastPersistenceFailureNotice = "";
 		lastPersistMillis = persistedAtMillis;
+	}
+
+	private void publishPersistenceFailureNotice(String failureNotice)
+	{
+		pendingStatusNotice = failureNotice;
+		if (panel == null)
+		{
+			return;
+		}
+
+		long noticeRevision = setViewState(panelMode, currentQuery);
+		if (panelMode == PanelMode.SEARCH && currentQuery.isEmpty())
+		{
+			publishPanelSnapshot(PanelViewSnapshot.clear(
+				noticeRevision,
+				nextSnapshotStatus("")));
+			return;
+		}
+		refreshActivePanelMode();
 	}
 
 	private String indexedStatus(List<ObservedItem> items)

@@ -21,10 +21,11 @@ final class AccountSessionController
 
     private final AccountStorageRepository repository;
     private final IntFunction<String> itemNameResolver;
-    private final StorageRetentionPolicy retentionPolicy;
+    private StorageRetentionPolicy retentionPolicy;
 
     private AccountKey activeAccountKey;
     private StorageIndex activeIndex;
+    private boolean recoveryRequiredBeforeSave;
 
     AccountSessionController(
         AccountStorageRepository repository,
@@ -90,6 +91,12 @@ final class AccountSessionController
         return activeIndex.items().size() != entriesBeforeTrim;
     }
 
+    boolean updateRetentionPolicy(int configuredMaximumEntries)
+    {
+        retentionPolicy = new StorageRetentionPolicy(configuredMaximumEntries);
+        return trimActiveIndex();
+    }
+
     Optional<String> clearActiveAccount()
     {
         if (activeAccountKey == null)
@@ -101,6 +108,7 @@ final class AccountSessionController
         {
             repository.clear(activeAccountKey);
             activeIndex = new StorageIndex();
+            recoveryRequiredBeforeSave = false;
             return Optional.of(CLEARED_NOTICE);
         }
         catch (IOException ex)
@@ -136,6 +144,7 @@ final class AccountSessionController
         {
             activeAccountKey = null;
             activeIndex = null;
+            recoveryRequiredBeforeSave = false;
         }
     }
 
@@ -148,6 +157,7 @@ final class AccountSessionController
             retentionPolicy.apply(loadedIndex);
             activeAccountKey = accountKey;
             activeIndex = loadedIndex;
+            recoveryRequiredBeforeSave = false;
             if (result.quarantinedPath().isPresent())
             {
                 notices.add(CORRUPT_NOTICE);
@@ -158,12 +168,18 @@ final class AccountSessionController
             LOG.warn("Could not load local account storage", ex);
             activeAccountKey = accountKey;
             activeIndex = new StorageIndex();
+            recoveryRequiredBeforeSave = true;
             notices.add(LOAD_FAILURE_NOTICE);
         }
     }
 
     private Optional<String> saveActiveIndex(AccountKey accountKey, StorageIndex index)
     {
+        if (recoveryRequiredBeforeSave && !recoverBeforeSave(accountKey, index))
+        {
+            return Optional.of(SAVE_FAILURE_NOTICE);
+        }
+
         retentionPolicy.apply(index);
         try
         {
@@ -174,6 +190,22 @@ final class AccountSessionController
         {
             LOG.warn("Could not save local account storage", ex);
             return Optional.of(SAVE_FAILURE_NOTICE);
+        }
+    }
+
+    private boolean recoverBeforeSave(AccountKey accountKey, StorageIndex sessionIndex)
+    {
+        try
+        {
+            AccountStorageLoadResult recovered = repository.load(accountKey, itemNameResolver);
+            sessionIndex.mergeRecovered(recovered.index());
+            recoveryRequiredBeforeSave = false;
+            return true;
+        }
+        catch (IOException ex)
+        {
+            LOG.warn("Could not reload local account storage before saving", ex);
+            return false;
         }
     }
 

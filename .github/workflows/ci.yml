@@ -45,15 +45,23 @@ jobs:
           zero_sha="0000000000000000000000000000000000000000"
 
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            start_sha="$(git merge-base "$PR_BASE_SHA" HEAD)"
-            git diff --check "$start_sha" HEAD
+            git diff --check "$PR_BASE_SHA" HEAD
           elif [[ "$EVENT_NAME" == "push" && -n "$PUSH_BEFORE_SHA" && "$PUSH_BEFORE_SHA" != "$zero_sha" ]] \
             && git cat-file -e "${PUSH_BEFORE_SHA}^{commit}" 2>/dev/null; then
             git diff --check "$PUSH_BEFORE_SHA" HEAD
           elif [[ -n "$DEFAULT_BRANCH" ]] \
             && git cat-file -e "refs/remotes/origin/${DEFAULT_BRANCH}^{commit}" 2>/dev/null; then
-            start_sha="$(git merge-base "refs/remotes/origin/$DEFAULT_BRANCH" HEAD)"
-            git diff --check "$start_sha" HEAD
+            start_sha="$(git merge-base "refs/remotes/origin/$DEFAULT_BRANCH" HEAD || true)"
+            if [[ -n "$start_sha" && "$start_sha" != "$(git rev-parse HEAD)" ]]; then
+              git diff --check "$start_sha" HEAD
+            elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+              git diff --check HEAD^ HEAD
+            else
+              empty_tree="$(git hash-object -t tree /dev/null)"
+              git diff --check "$empty_tree" HEAD
+            fi
+          elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            git diff --check HEAD^ HEAD
           else
             empty_tree="$(git hash-object -t tree /dev/null)"
             git diff --check "$empty_tree" HEAD

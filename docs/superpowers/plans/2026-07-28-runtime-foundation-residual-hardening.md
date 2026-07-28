@@ -165,4 +165,3 @@ git commit -m "Harden CI whitespace range selection"
 - Every CI event path checks a non-empty submitted range, including zero-SHA
   default-branch and root-commit pushes.
 - Full tests and repository integrity checks pass.
-

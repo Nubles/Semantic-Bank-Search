@@ -32,7 +32,7 @@ public class AccountStorageRepositoryTest
     @Test public void persistedJsonOmitsNamesAndAccountIdentity() throws IOException
     {
         long hash = 123456789L; AccountKey k = key(hash); repo().save(k, index(2434, "Prayer potion", 2));
-        String json = Files.readString(path(k), StandardCharsets.UTF_8); JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        String json = Files.readString(path(k), StandardCharsets.UTF_8); JsonObject root = new JsonParser().parse(json).getAsJsonObject();
         assertFalse(json.contains("Prayer potion")); assertFalse(json.contains(Long.toString(hash))); assertFalse(root.has("accountHash")); assertFalse(root.has("displayName")); assertFalse(root.getAsJsonArray("items").get(0).getAsJsonObject().has("name"));
     }
 

@@ -89,7 +89,7 @@ final class AccountStorageRepository
         }
         try
         {
-            JsonElement root = JsonParser.parseString(fileOperations.readString(indexPath));
+            JsonElement root = new JsonParser().parse(fileOperations.readString(indexPath));
             if (!root.isJsonObject())
             {
                 return quarantined(indexPath);

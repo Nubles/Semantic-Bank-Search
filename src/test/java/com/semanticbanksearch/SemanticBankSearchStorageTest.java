@@ -12,7 +12,7 @@ public class SemanticBankSearchStorageTest
     @Test public void documentConversionOmitsObservedItemNames()
     {
         StorageIndex index = new StorageIndex(); index.record(2434, "Prayer potion(4)", 2, StorageSourceType.BANK, "Bank", true, 1000L);
-        String json = new Gson().toJson(SemanticBankSearchStorage.toDocument(index)); JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        String json = new Gson().toJson(SemanticBankSearchStorage.toDocument(index)); JsonObject root = new JsonParser().parse(json).getAsJsonObject();
         assertFalse(json.contains("Prayer potion")); assertFalse(root.getAsJsonArray("items").get(0).getAsJsonObject().has("name"));
     }
 

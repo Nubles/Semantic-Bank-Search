@@ -19,9 +19,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JButton;
+import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import net.runelite.api.GameState;
 import org.junit.Rule;
@@ -77,6 +80,136 @@ public class SemanticBankSearchPluginTest
         assertTrue(containsItem(controller.activeIndexOrNull(), 202));
         assertFalse(repository.load(accountKey(ACCOUNT_A), id -> "Item " + id)
             .index().items().get(0).isCurrentlyVisible());
+    }
+
+    @Test
+    public void accountTransitionInvalidatesQueuedSnapshotBeforeNewAccountLoads() throws Exception
+    {
+        AccountStorageRepository repository = repository();
+        repository.save(accountKey(ACCOUNT_B), index(202, "Account B item", false));
+        CountDownLatch loadStarted = new CountDownLatch(1);
+        CountDownLatch allowLoad = new CountDownLatch(1);
+        AccountSessionController controller = new AccountSessionController(
+            repository,
+            itemId -> {
+                if (itemId == 202)
+                {
+                    loadStarted.countDown();
+                    awaitLatch(allowLoad);
+                }
+                return "Item " + itemId;
+            },
+            new StorageRetentionPolicy(800));
+        StorageIndex firstIndex = controller.switchTo(ACCOUNT_A).getActiveIndex();
+        firstIndex.record(101, "Account A item", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        AtomicReference<RecordingPanel> panelReference = new AtomicReference<>();
+        runOnEdt(() -> {
+            panelReference.set(new RecordingPanel());
+            panelReference.get().lastSnapshot = null;
+        });
+        List<Runnable> swingTasks = new ArrayList<>();
+        SemanticBankSearchPlugin plugin = new SemanticBankSearchPlugin();
+        plugin.setObservedStorageLifecycleStateForTesting(firstIndex, noVisibleStorageScanner(), config(true));
+        plugin.setSearchComponentsForTesting(
+            firstIndex,
+            new SemanticCoverageAnalyzer(Collections.emptyList()),
+            panelReference.get(),
+            null);
+        plugin.setRuntimeDependenciesForTesting(
+            controller,
+            new ThreadBridge(Runnable::run, swingTasks::add));
+        plugin.showCoverageAuditForTesting();
+        assertEquals(1, swingTasks.size());
+
+        AtomicReference<Throwable> switchFailure = new AtomicReference<>();
+        Thread switchThread = new Thread(() -> {
+            try
+            {
+                plugin.handleAccountHashChanged(ACCOUNT_B);
+            }
+            catch (Throwable failure)
+            {
+                switchFailure.set(failure);
+            }
+        });
+        switchThread.start();
+        assertTrue(loadStarted.await(5L, TimeUnit.SECONDS));
+        try
+        {
+            runOnEdt(swingTasks.get(0));
+            runOnEdt(() -> assertNull(panelReference.get().lastSnapshot));
+        }
+        finally
+        {
+            allowLoad.countDown();
+            switchThread.join(5_000L);
+        }
+
+        assertFalse(switchThread.isAlive());
+        if (switchFailure.get() != null)
+        {
+            throw new AssertionError("Account switch failed", switchFailure.get());
+        }
+    }
+
+    @Test
+    public void queuedPanelCommandCannotMutateNextAccountView() throws Exception
+    {
+        AccountStorageRepository repository = repository();
+        StorageIndex nextIndex = new StorageIndex();
+        nextIndex.record(300, "Barrows teleport", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+        nextIndex.record(301, "Prayer potion(4)", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+        repository.save(accountKey(ACCOUNT_B), nextIndex);
+        AccountSessionController controller = new AccountSessionController(
+            repository,
+            itemId -> itemId == 300 ? "Barrows teleport" : "Prayer potion(4)",
+            new StorageRetentionPolicy(800));
+        StorageIndex firstIndex = controller.switchTo(ACCOUNT_A).getActiveIndex();
+        firstIndex.record(101, "Account A item", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        List<Runnable> clientTasks = new ArrayList<>();
+        List<Runnable> swingTasks = new ArrayList<>();
+        SemanticBankSearchPlugin plugin = new SemanticBankSearchPlugin();
+        plugin.setObservedStorageLifecycleStateForTesting(firstIndex, noVisibleStorageScanner(), config(true));
+        plugin.setRuntimeDependenciesForTesting(
+            controller,
+            new ThreadBridge(clientTasks::add, swingTasks::add));
+        AtomicReference<SemanticBankSearchPanel> panelReference = new AtomicReference<>();
+        runOnEdt(() -> panelReference.set(plugin.createPanel()));
+        RecordingOverlay overlay = new RecordingOverlay(config(true));
+        plugin.setSearchComponentsForTesting(
+            firstIndex,
+            new SemanticCoverageAnalyzer(SemanticLibrary.create()),
+            new ReadinessAnalyzer(SemanticLibrary.create(), ReadinessPackLibrary.create()),
+            panelReference.get(),
+            overlay);
+
+        runOnEdt(() -> findButton(panelReference.get(), "Clear").doClick());
+        assertEquals(1, clientTasks.size());
+        plugin.handleAccountHashChanged(ACCOUNT_B);
+        plugin.showReadinessForTesting("barrows trip");
+        for (Runnable swingTask : new ArrayList<>(swingTasks))
+        {
+            runOnEdt(swingTask);
+        }
+        runOnEdt(() -> findTextField(panelReference.get()).setText("barrows trip"));
+        int renderedResultCount = panelReference.get().currentResultCountForTesting();
+        String renderedStatus = panelReference.get().currentStatusForTesting();
+        List<Integer> nextAccountHighlights = new ArrayList<>(overlay.lastHighlightedItemIds);
+        int swingTaskCount = swingTasks.size();
+
+        clientTasks.get(0).run();
+        for (int i = swingTaskCount; i < swingTasks.size(); i++)
+        {
+            runOnEdt(swingTasks.get(i));
+        }
+
+        assertEquals(swingTaskCount, swingTasks.size());
+        assertEquals(nextAccountHighlights, overlay.lastHighlightedItemIds);
+        runOnEdt(() -> {
+            assertEquals("barrows trip", findTextField(panelReference.get()).getText());
+            assertEquals(renderedResultCount, panelReference.get().currentResultCountForTesting());
+            assertEquals(renderedStatus, panelReference.get().currentStatusForTesting());
+        });
     }
 
     @Test
@@ -207,6 +340,18 @@ public class SemanticBankSearchPluginTest
         assertTrue(snapshot.getSearchResults().isEmpty());
         assertTrue(snapshot.getIndexedItems().isEmpty());
         assertNull(controller.activeIndexOrNull());
+    }
+
+    @Test
+    public void clearWhileLoggedOutRepublishesLoggedOutSnapshot() throws Exception
+    {
+        assertLoggedOutPanelCommand("Clear");
+    }
+
+    @Test
+    public void emptySearchWhileLoggedOutRepublishesLoggedOutSnapshot() throws Exception
+    {
+        assertLoggedOutPanelCommand("Search");
     }
 
     @Test
@@ -360,6 +505,53 @@ public class SemanticBankSearchPluginTest
         assertEquals(800, runtime.index.items().size());
         assertEquals(800, persistedIndex(runtime).items().size());
     }
+
+    @Test
+    public void failedPersistenceKeepsTimerRetryableAndPublishesNotice() throws Exception
+    {
+        AccountStorageRepository repository = repository();
+        AccountSessionController controller = new AccountSessionController(
+            repository,
+            itemId -> "Item " + itemId,
+            new StorageRetentionPolicy(800));
+        StorageIndex activeIndex = controller.switchTo(ACCOUNT_A).getActiveIndex();
+        activeIndex.record(101, "Account A item", 1, StorageSourceType.BANK, "Bank", true, 1_000L);
+        Path blockedStoragePath = temporaryFolder.getRoot().toPath().resolve("semantic-bank-search");
+        Files.writeString(blockedStoragePath, "blocked", StandardCharsets.UTF_8);
+        AtomicReference<RecordingPanel> panelReference = new AtomicReference<>();
+        runOnEdt(() -> panelReference.set(new RecordingPanel()));
+        List<Runnable> swingTasks = new ArrayList<>();
+        SemanticBankSearchPlugin plugin = new SemanticBankSearchPlugin();
+        plugin.setObservedStorageLifecycleStateForTesting(
+            activeIndex,
+            noVisibleStorageScanner(),
+            config(true));
+        plugin.setSearchComponentsForTesting(
+            activeIndex,
+            new SemanticCoverageAnalyzer(Collections.emptyList()),
+            panelReference.get(),
+            null);
+        plugin.setRuntimeDependenciesForTesting(
+            controller,
+            new ThreadBridge(Runnable::run, swingTasks::add));
+        plugin.rememberVisibleStorageSourceForTesting(ObservedStorageSource.bank());
+        plugin.setLastPersistMillisForTesting(1_950L);
+
+        plugin.handleObservedStorageTick(2_000L);
+        plugin.showCoverageAuditForTesting();
+
+        assertEquals(1, swingTasks.size());
+        runOnEdt(swingTasks.get(0));
+        assertEquals(
+            "Local account storage could not be saved.",
+            panelReference.get().lastSnapshot.getStatus());
+
+        Files.delete(blockedStoragePath);
+        plugin.handleObservedStorageTick(2_001L);
+
+        assertTrue(Files.exists(indexPath(ACCOUNT_A)));
+    }
+
     @Test
     public void coverageStatusCountsCoveredObservedItems()
     {
@@ -479,6 +671,41 @@ public class SemanticBankSearchPluginTest
             assertEquals(2L, panel.lastRenderedRevisionForTesting());
             assertTrue(panel.currentStatusForTesting().startsWith("Readiness:"));
         });
+    }
+
+    private void assertLoggedOutPanelCommand(String buttonText) throws Exception
+    {
+        AccountSessionController controller = controller();
+        AtomicReference<RecordingPanel> renderPanelReference = new AtomicReference<>();
+        AtomicReference<SemanticBankSearchPanel> commandPanelReference = new AtomicReference<>();
+        runOnEdt(() -> renderPanelReference.set(new RecordingPanel()));
+        List<Runnable> swingTasks = new ArrayList<>();
+        RecordingOverlay overlay = new RecordingOverlay(config(true));
+        SemanticBankSearchPlugin plugin = new SemanticBankSearchPlugin();
+        plugin.setObservedStorageLifecycleStateForTesting(null, noVisibleStorageScanner(), config(true));
+        plugin.setSearchComponentsForTesting(
+            null,
+            new SemanticCoverageAnalyzer(Collections.emptyList()),
+            renderPanelReference.get(),
+            overlay);
+        plugin.setRuntimeDependenciesForTesting(
+            controller,
+            new ThreadBridge(Runnable::run, swingTasks::add));
+        runOnEdt(() -> commandPanelReference.set(plugin.createPanel()));
+        plugin.handleAccountHashChanged(0L);
+        runOnEdt(swingTasks.get(0));
+        overlay.setHighlightedItemIds(Collections.singletonList(999));
+
+        runOnEdt(() -> findButton(commandPanelReference.get(), buttonText).doClick());
+
+        assertEquals(2, swingTasks.size());
+        runOnEdt(swingTasks.get(1));
+        PanelViewSnapshot snapshot = renderPanelReference.get().lastSnapshot;
+        assertEquals(PanelViewSnapshot.Kind.CLEAR, snapshot.getKind());
+        assertEquals(LOGGED_OUT_STATUS, snapshot.getStatus());
+        assertTrue(snapshot.getSearchResults().isEmpty());
+        assertTrue(snapshot.getIndexedItems().isEmpty());
+        assertTrue(overlay.lastHighlightedItemIds.isEmpty());
     }
 
     private TestRuntime runtime(
@@ -614,6 +841,42 @@ public class SemanticBankSearchPluginTest
             }
         }
         throw new AssertionError("Button not found: " + text);
+    }
+
+    private static JTextField findTextField(Container root)
+    {
+        for (Component component : root.getComponents())
+        {
+            if (component instanceof JTextField)
+            {
+                return (JTextField) component;
+            }
+            if (component instanceof Container)
+            {
+                try
+                {
+                    return findTextField((Container) component);
+                }
+                catch (AssertionError ignored)
+                {
+                    // Continue through sibling containers.
+                }
+            }
+        }
+        throw new AssertionError("Text field not found");
+    }
+
+    private static void awaitLatch(CountDownLatch latch)
+    {
+        try
+        {
+            assertTrue(latch.await(5L, TimeUnit.SECONDS));
+        }
+        catch (InterruptedException ex)
+        {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Interrupted while awaiting test latch", ex);
+        }
     }
 
     private static final class TestRuntime

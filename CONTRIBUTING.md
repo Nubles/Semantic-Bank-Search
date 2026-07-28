@@ -29,6 +29,15 @@ For semantic changes, run:
 .\gradlew.bat test
 ```
 
+For the trustworthy runtime foundation, also run the focused checks:
+
+```powershell
+.\gradlew.bat test --tests com.semanticbanksearch.AccountKeyTest
+.\gradlew.bat test --tests com.semanticbanksearch.AccountStorageRepositoryTest
+.\gradlew.bat test --tests com.semanticbanksearch.AccountSessionControllerTest
+.\gradlew.bat test --tests com.semanticbanksearch.PanelViewSnapshotTest
+```
+
 ## Adding Semantic Coverage
 
 Read [Semantic Coverage Guide](docs/SEMANTIC_COVERAGE.md) before adding or changing rules.
@@ -69,6 +78,13 @@ Contributions must not add:
 - Storage inference for containers the client has not observed.
 
 The plugin may list and highlight matching observed items, but it must not act on items.
+
+Runtime persistence review rules:
+
+- Do not store bank contents in `ConfigManager`.
+- Do not write a raw account hash or account display name to disk.
+- Swing callbacks must not read RuneLite client state directly; use the existing thread bridge and immutable snapshots.
+- Persistence failures must never retain another account's in-memory index.
 
 ## Before Opening A PR
 

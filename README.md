@@ -94,6 +94,14 @@ The plugin reads visible bank items plus safe observed storage containers such a
 
 It cannot infer items from tabs, accounts, or storage containers that have not been opened in RuneLite. POH storage is not inferred; only explicitly safe RuneLite-exposed inventories are remembered.
 
+Observed storage is local-only and account-isolated. Account-local indexes are stored below:
+
+`RuneLite.RUNELITE_DIR/semantic-bank-search/accounts/<account-key>/index.json`
+
+`<account-key>` is an opaque derived key, not a raw account hash. Account display names and item names are not persisted in these JSON files. The active account's index is loaded only after that account becomes active, and deleting or clearing an index leaves it empty until storage is observed again. Malformed index files are quarantined automatically and the session continues with an empty index plus a non-blocking notice.
+
+The runtime supports clearing the active account's observed storage through its controller operation. Final settings/UI exposure for clear-account-data is still pending milestone 4. Ordinary plugin preferences may continue to use RuneLite's `ConfigManager`; bank contents belong in the account-local index instead.
+
 ## Safety
 
 Semantic Bank Search does not:

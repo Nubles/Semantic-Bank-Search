@@ -57,6 +57,16 @@ Use a real account with a messy bank if possible.
 21. Close and reopen the bank; confirm visible state refreshes without losing remembered storage.
 22. Restart RuneLite and confirm saved observations load without errors.
 
+### Runtime Storage And Account Isolation
+
+23. Log into account A, observe its bank, log out, log into account B, and confirm no account A results appear.
+24. Restart RuneLite and confirm account A restores only after account A is active.
+25. Inspect the local account JSON and confirm account display names and item names are absent.
+26. Corrupt `index.json`, restart, and confirm a quarantine file is created with a non-blocking notice.
+27. Switch worlds and confirm the active account's index is retained.
+28. Test a bank larger than 800 unique entries.
+29. Run clear-account-data and confirm only the active account is cleared. The controller operation exists, but the final settings/UI exposure remains pending milestone 4.
+
 Record the RuneLite version, operating system, bank size, enabled compatibility plugins, and outcome.
 
 ## Beta Acceptance Bar

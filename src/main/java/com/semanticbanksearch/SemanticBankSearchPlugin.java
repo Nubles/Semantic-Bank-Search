@@ -234,9 +234,30 @@ public class SemanticBankSearchPlugin extends Plugin
 	{
 		if (event == null
 			|| !SemanticBankSearchConfig.GROUP.equals(event.getGroup())
-			|| !MAXIMUM_REMEMBERED_ENTRIES_KEY.equals(event.getKey())
-			|| config == null
-			|| sessionController == null)
+			|| !MAXIMUM_REMEMBERED_ENTRIES_KEY.equals(event.getKey()))
+		{
+			return;
+		}
+
+		ThreadBridge bridge = threadBridge;
+		if (bridge == null)
+		{
+			return;
+		}
+
+		long capturedEpoch = accountSessionEpoch.get();
+		bridge.submitClient(() -> {
+			if (capturedEpoch != accountSessionEpoch.get())
+			{
+				return;
+			}
+			applyRetentionConfigChange();
+		});
+	}
+
+	private void applyRetentionConfigChange()
+	{
+		if (config == null || sessionController == null)
 		{
 			return;
 		}

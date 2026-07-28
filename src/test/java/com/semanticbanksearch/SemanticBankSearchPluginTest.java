@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JButton;
 import javax.swing.JTextField;
@@ -721,7 +722,7 @@ public class SemanticBankSearchPluginTest
     }
 
     @Test
-    public void loweringRetentionConfigClampsTrimsPersistsAndRefreshes() throws Exception
+    public void retentionConfigChangeQueuesClientCommandBeforeMutatingIndex() throws Exception
     {
         StorageIndex oversizedIndex = new StorageIndex();
         for (int itemId = 1; itemId <= 150; itemId++)
@@ -739,6 +740,7 @@ public class SemanticBankSearchPluginTest
         TestRuntime runtime = runtime(oversizedIndex, config, noVisibleStorageScanner());
         AtomicReference<RecordingPanel> panelReference = new AtomicReference<>();
         runOnEdt(() -> panelReference.set(new RecordingPanel()));
+        List<Runnable> clientTasks = new ArrayList<>();
         List<Runnable> swingTasks = new ArrayList<>();
         runtime.plugin.setSearchComponentsForTesting(
             runtime.index,
@@ -747,18 +749,109 @@ public class SemanticBankSearchPluginTest
             null);
         runtime.plugin.setRuntimeDependenciesForTesting(
             runtime.controller,
-            new ThreadBridge(Runnable::run, swingTasks::add));
+            new ThreadBridge(clientTasks::add, swingTasks::add));
         runtime.plugin.showCoverageAuditForTesting();
         runOnEdt(swingTasks.remove(0));
 
         config.maximumRememberedEntries = 50;
         runtime.plugin.onConfigChanged(configChanged("maximumRememberedEntries"));
 
+        assertEquals(150, runtime.index.items().size());
+        assertFalse(Files.exists(indexPath(ACCOUNT_A)));
+        assertEquals(0, swingTasks.size());
+        assertEquals(1, clientTasks.size());
+
+        clientTasks.get(0).run();
+
         assertEquals(100, runtime.index.items().size());
         assertEquals(100, persistedIndex(runtime).items().size());
         assertEquals(1, swingTasks.size());
         runOnEdt(swingTasks.get(0));
         assertEquals(100, panelReference.get().lastSnapshot.getCoverageResults().size());
+    }
+
+    @Test
+    public void queuedRetentionConfigChangeCannotMutateNextAccount() throws Exception
+    {
+        AtomicInteger persistenceWrites = new AtomicInteger();
+        AccountStorageRepository repository = repositoryWithPersistenceCounter(persistenceWrites);
+        StorageIndex nextAccountIndex = new StorageIndex();
+        nextAccountIndex.record(300, "Barrows teleport", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+        nextAccountIndex.record(301, "Prayer potion(4)", 2, StorageSourceType.BANK, "Bank", true, 1_000L);
+        for (int itemId = 1_000; itemId < 1_148; itemId++)
+        {
+            nextAccountIndex.record(
+                itemId,
+                "Account B item " + itemId,
+                1,
+                StorageSourceType.BANK,
+                "Bank",
+                false,
+                itemId);
+        }
+        repository.save(accountKey(ACCOUNT_B), nextAccountIndex);
+        persistenceWrites.set(0);
+
+        MutableConfig config = new MutableConfig(true, 800);
+        AccountSessionController controller = new AccountSessionController(
+            repository,
+            itemId -> itemId == 300 ? "Barrows teleport" : "Prayer potion(4)",
+            new StorageRetentionPolicy(config.maximumRememberedEntries()));
+        StorageIndex firstAccountIndex = controller.switchTo(ACCOUNT_A).getActiveIndex();
+        for (int itemId = 1; itemId <= 150; itemId++)
+        {
+            firstAccountIndex.record(
+                itemId,
+                "Account A item " + itemId,
+                1,
+                StorageSourceType.BANK,
+                "Bank",
+                false,
+                itemId);
+        }
+
+        List<Runnable> clientTasks = new ArrayList<>();
+        List<Runnable> swingTasks = new ArrayList<>();
+        AtomicReference<RecordingPanel> panelReference = new AtomicReference<>();
+        runOnEdt(() -> panelReference.set(new RecordingPanel()));
+        RecordingOverlay overlay = new RecordingOverlay(config);
+        SemanticBankSearchPlugin plugin = new SemanticBankSearchPlugin();
+        plugin.setObservedStorageLifecycleStateForTesting(firstAccountIndex, noVisibleStorageScanner(), config);
+        plugin.setSearchComponentsForTesting(
+            firstAccountIndex,
+            new SemanticCoverageAnalyzer(SemanticLibrary.create()),
+            new ReadinessAnalyzer(SemanticLibrary.create(), ReadinessPackLibrary.create()),
+            panelReference.get(),
+            overlay);
+        plugin.setRuntimeDependenciesForTesting(
+            controller,
+            new ThreadBridge(clientTasks::add, swingTasks::add));
+
+        config.maximumRememberedEntries = 50;
+        plugin.onConfigChanged(configChanged("maximumRememberedEntries"));
+        assertEquals(1, clientTasks.size());
+
+        plugin.handleAccountHashChanged(ACCOUNT_B);
+        plugin.showReadinessForTesting("barrows trip");
+        for (Runnable swingTask : new ArrayList<>(swingTasks))
+        {
+            runOnEdt(swingTask);
+        }
+        StorageIndex activeNextAccountIndex = controller.activeIndexOrNull();
+        int persistedBeforeOldTask = persistenceWrites.get();
+        int nextAccountSize = activeNextAccountIndex.items().size();
+        String nextAccountQuery = panelReference.get().lastSnapshot.getQuery();
+        List<Integer> nextAccountHighlights = new ArrayList<>(overlay.lastHighlightedItemIds);
+        int swingTaskCount = swingTasks.size();
+
+        clientTasks.get(0).run();
+
+        assertSame(activeNextAccountIndex, controller.activeIndexOrNull());
+        assertEquals(nextAccountSize, activeNextAccountIndex.items().size());
+        assertEquals(persistedBeforeOldTask, persistenceWrites.get());
+        assertEquals(nextAccountQuery, panelReference.get().lastSnapshot.getQuery());
+        assertEquals(nextAccountHighlights, overlay.lastHighlightedItemIds);
+        assertEquals(swingTaskCount, swingTasks.size());
     }
 
     @Test
@@ -1024,6 +1117,40 @@ public class SemanticBankSearchPluginTest
             Clock.systemUTC());
     }
 
+    private AccountStorageRepository repositoryWithPersistenceCounter(AtomicInteger persistenceWrites)
+    {
+        return new AccountStorageRepository(
+            temporaryFolder.getRoot().toPath(),
+            new Gson(),
+            Clock.systemUTC(),
+            new AccountStorageRepository.FileOperations()
+            {
+                @Override
+                public String readString(Path path) throws IOException
+                {
+                    return Files.readString(path, StandardCharsets.UTF_8);
+                }
+
+                @Override
+                public void writeString(Path path, String value) throws IOException
+                {
+                    persistenceWrites.incrementAndGet();
+                    Files.writeString(path, value, StandardCharsets.UTF_8);
+                }
+
+                @Override
+                public void move(Path source, Path target, CopyOption... options) throws IOException
+                {
+                    Files.move(source, target, options);
+                }
+
+                @Override
+                public void deleteIfExists(Path path) throws IOException
+                {
+                    Files.deleteIfExists(path);
+                }
+            });
+    }
     private AccountStorageRepository repositoryFailingWritesFor(long accountHash)
     {
         String blockedAccountKey = accountKey(accountHash).value();

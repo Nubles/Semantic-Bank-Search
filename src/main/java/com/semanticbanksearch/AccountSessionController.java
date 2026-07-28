@@ -78,6 +78,18 @@ final class AccountSessionController
         return saveActiveIndex(activeAccountKey, activeIndex);
     }
 
+    boolean trimActiveIndex()
+    {
+        if (activeIndex == null)
+        {
+            return false;
+        }
+
+        int entriesBeforeTrim = activeIndex.items().size();
+        retentionPolicy.apply(activeIndex);
+        return activeIndex.items().size() != entriesBeforeTrim;
+    }
+
     Optional<String> clearActiveAccount()
     {
         if (activeAccountKey == null)

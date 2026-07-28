@@ -171,6 +171,19 @@ public class AccountSessionControllerTest
         assertTrue(controller.activeIndexOrNull().items().isEmpty());
     }
 
+    @Test public void trimActiveIndexReportsOnlyActualRetentionChanges()
+    {
+        AccountSessionController controller = controller();
+        StorageIndex activeIndex = controller.switchTo(101L).getActiveIndex();
+        activeIndex.record(101, "First item", 1, StorageSourceType.BANK, "Bank", false, 1L);
+        activeIndex.record(102, "Second item", 1, StorageSourceType.BANK, "Bank", false, 2L);
+        activeIndex.record(103, "Newest item", 1, StorageSourceType.BANK, "Bank", false, 3L);
+
+        assertTrue(controller.trimActiveIndex());
+        assertEquals(2, activeIndex.items().size());
+        assertFalse(controller.trimActiveIndex());
+    }
+
     private AccountSessionController controller()
     {
         return controller(repository());

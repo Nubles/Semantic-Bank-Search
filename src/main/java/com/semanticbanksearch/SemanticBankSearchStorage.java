@@ -1,7 +1,5 @@
 package com.semanticbanksearch;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonSyntaxException;
 import java.util.function.IntFunction;
 
 class SemanticBankSearchStorage
@@ -48,20 +46,5 @@ class SemanticBankSearchStorage
             // The persisted observation remains usable while item metadata is unavailable.
         }
         return "Item " + itemId;
-    }
-
-    // Compatibility for the plugin until Task 7 removes the legacy configuration flow.
-    @Deprecated
-    static String serialize(Gson gson, StorageIndex index)
-    {
-        return gson == null ? "" : gson.toJson(index == null ? new StorageIndex() : index);
-    }
-
-    @Deprecated
-    static StorageIndex deserialize(Gson gson, String json)
-    {
-        if (gson == null || json == null || json.trim().isEmpty()) return new StorageIndex();
-        try { return gson.fromJson(json, StorageIndex.class); }
-        catch (JsonSyntaxException | IllegalStateException ex) { return new StorageIndex(); }
     }
 }

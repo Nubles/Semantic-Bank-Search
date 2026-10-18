@@ -98,6 +98,33 @@ class SemanticBankFilter
             : "";
     }
 
+    /** Whether the bank would read this input as a purpose rather than a name. */
+    boolean isSemantic(String input)
+    {
+        String normalizedInput = SemanticSearchEngine.normalize(input);
+        if (!normalizedInput.equals(cachedInput))
+        {
+            prepare(normalizedInput);
+        }
+        return cachedSemanticSearch;
+    }
+
+    /** Whether the game's own item data answers this query, rather than the purpose library. */
+    boolean isKindQuery(String input)
+    {
+        String query = semanticQuery(input);
+        return equipmentClassifier.recognizes(query)
+            || consumableClassifier.recognizes(query)
+            || numericClassifier.recognizes(query)
+            || rankingClassifier.recognizes(query);
+    }
+
+    /** The separate constraints of a compound query, or empty for a single purpose. */
+    List<String> clauses(String input)
+    {
+        return queryParser.parse(semanticQuery(input));
+    }
+
     private void prepare(String normalizedInput)
     {
         metadataCache.clear();
@@ -127,9 +154,17 @@ class SemanticBankFilter
             return rankingClassifier.matches(clause, item, cachedOwnedItems);
         }
 
-        return equipmentClassifier.matches(clause, item)
-            || consumableClassifier.matches(clause, item)
-            || engine.matchesPurpose(clause, item == null ? "" : item.getName());
+        // A kind of item the game itself knows ("prayer gear", "food") is answered from the
+        // item's own stats and actions alone, so a prayer potion is never "prayer gear".
+        if (equipmentClassifier.recognizes(clause))
+        {
+            return equipmentClassifier.matches(clause, item);
+        }
+        if (consumableClassifier.recognizes(clause))
+        {
+            return consumableClassifier.matches(clause, item);
+        }
+        return engine.matchesPurpose(clause, item == null ? "" : item.getName());
     }
 
     private List<BankItemMetadata> loadOwnedItems()

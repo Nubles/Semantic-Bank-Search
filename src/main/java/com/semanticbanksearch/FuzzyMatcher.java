@@ -31,7 +31,7 @@ final class FuzzyMatcher
             boolean matched = false;
             while (queryIndex < queryTokens.length)
             {
-                if (tokensMatch(queryTokens[queryIndex], phraseToken))
+                if (phraseTokenMatches(queryTokens[queryIndex], phraseToken, queryTokens.length))
                 {
                     matched = true;
                     queryIndex++;
@@ -46,6 +46,23 @@ final class FuzzyMatcher
         }
         return true;
     }
+
+    /**
+     * Purpose phrases accept typos and finished-early words, but a word must be a few letters
+     * long before it completes one: otherwise every keystroke in the bank search ("s", "sh")
+     * would be read as some purpose.
+     */
+    private static boolean phraseTokenMatches(String queryToken, String phraseToken, int queryWords)
+    {
+        int minimum = queryWords > 1 ? MIN_COMPLETION_LENGTH - 1 : MIN_COMPLETION_LENGTH;
+        if (queryToken.length() < minimum && !queryToken.equals(phraseToken))
+        {
+            return false;
+        }
+        return tokensMatch(queryToken, phraseToken);
+    }
+
+    private static final int MIN_COMPLETION_LENGTH = 4;
 
     static boolean tokensMatch(String queryToken, String candidateToken)
     {

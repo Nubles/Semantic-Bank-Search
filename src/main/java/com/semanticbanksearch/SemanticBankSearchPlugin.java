@@ -1,92 +1,78 @@
 package com.semanticbanksearch;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonParseException;
 import com.google.inject.Provides;
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.image.BufferedImage;
-import java.time.Clock;
+import com.semanticbanksearch.ui.Sigil;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
 import javax.inject.Inject;
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.InventoryID;
 import net.runelite.api.Item;
-import net.runelite.api.ItemContainer;
 import net.runelite.api.ItemComposition;
-import net.runelite.api.events.AccountHashChanged;
+import net.runelite.api.ItemContainer;
+import net.runelite.api.Player;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
+import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.ScriptCallbackEvent;
-import net.runelite.api.widgets.ComponentID;
+import net.runelite.api.events.WidgetClosed;
+import net.runelite.api.events.WidgetLoaded;
+import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.gameval.InventoryID;
+import net.runelite.api.gameval.VarClientID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.callback.ClientThread;
-import net.runelite.client.RuneLite;
 import net.runelite.client.config.ConfigManager;
-import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.events.RuneScapeProfileChanged;
 import net.runelite.client.game.ItemEquipmentStats;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemStats;
+import net.runelite.client.plugins.Plugin;
+import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.plugins.bank.BankSearch;
 import net.runelite.client.plugins.itemstats.Effect;
 import net.runelite.client.plugins.itemstats.ItemStatChangesService;
 import net.runelite.client.plugins.itemstats.StatChange;
 import net.runelite.client.plugins.itemstats.stats.Stats;
-import net.runelite.client.plugins.Plugin;
-import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.AsyncBufferedImage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @PluginDescriptor(
 	name = "Semantic Bank Search",
-	description = "Beta: searches observed bank and storage items by purpose using local semantic rules.",
-	tags = {"bank", "search", "items", "storage", "utility"}
+	description = "Search what you own by what it is for: \"prayer restoration\", \"food over 18 hp\", \"best melee weapon\", in the bank and from anywhere.",
+	tags = {"bank", "search", "items", "storage", "purpose", "trip", "prep", "codex"}
 )
 public class SemanticBankSearchPlugin extends Plugin
 {
-	private static final long SAVE_INTERVAL_MILLIS = 60_000L;
-	private static final String LOGGED_OUT_STATUS = "Log in to use account-local storage.";
-	private static final String MAXIMUM_REMEMBERED_ENTRIES_KEY = "maximumRememberedEntries";
+	private static final Logger log = LoggerFactory.getLogger(SemanticBankSearchPlugin.class);
 
-	private enum PanelMode
-	{
-		SEARCH,
-		ALL_INDEXED,
-		READINESS,
-		COVERAGE_AUDIT
-	}
-
-	private static class ViewState
-	{
-		private final PanelMode panelMode;
-		private final String query;
-		private final long revision;
-
-		private ViewState(PanelMode panelMode, String query, long revision)
-		{
-			this.panelMode = panelMode;
-			this.query = query;
-			this.revision = revision;
-		}
-	}
+	private static final String VAULT_KEY = "vault";
+	private static final long SAVE_EVERY_MS = 30_000L;
 
 	@Inject
 	private Client client;
 
 	@Inject
-	private ClientToolbar clientToolbar;
+	private ClientThread clientThread;
 
 	@Inject
-	private ClientThread clientThread;
+	private ClientToolbar clientToolbar;
 
 	@Inject
 	private ConfigManager configManager;
@@ -98,37 +84,40 @@ public class SemanticBankSearchPlugin extends Plugin
 	private ItemManager itemManager;
 
 	@Inject
+	private ItemStatChangesService itemStatChangesService;
+
+	@Inject
+	private BankSearch bankSearch;
+
+	@Inject
 	private SemanticBankSearchConfig config;
 
 	@Inject
 	private Gson gson;
 
-	@Inject
-	private ItemStatChangesService itemStatChangesService;
-
-	private final RelativeRankingClassifier rankingClassifier = new RelativeRankingClassifier();
-	private final AtomicLong accountSessionEpoch = new AtomicLong();
-	private AccountSessionController sessionController;
-	private StorageIndex index;
 	private SemanticSearchEngine engine;
 	private SemanticBankFilter bankFilter;
-	private SemanticCoverageAnalyzer coverageAnalyzer;
-	private ReadinessAnalyzer readinessAnalyzer;
-	private ObservedStorageScanner storageScanner;
-	private final Set<String> visibleStorageSourceKeys = new HashSet<>();
-	private SemanticBankSearchPanel panel;
-	private ThreadBridge threadBridge;
+	private Finder finder;
+	private ReadinessAnalyzer readiness;
+	private SemanticCoverageAnalyzer coverage;
 	private SemanticBankSearchOverlay overlay;
-	private NavigationButton navigationButton;
-	private String currentQuery = "";
-	private PanelMode panelMode = PanelMode.SEARCH;
-	private long viewRevision;
-	private boolean bankOpen;
-	private long lastPersistMillis;
-	private long lastPersistAttemptMillis;
-	private boolean persistenceRetryPending;
-	private String pendingStatusNotice = "";
-	private String lastPersistenceFailureNotice = "";
+	private SemanticBankSearchPanel panel;
+	private NavigationButton navButton;
+
+	/** Only touched on the client thread. */
+	private final Map<Integer, String> names = new HashMap<>();
+	private final Map<Integer, BankItemMetadata> metadata = new HashMap<>();
+	private final Set<String> openPlaces = new HashSet<>();
+	private Vault vault;
+	private String profile;
+	private StorageIndex index = new StorageIndex();
+	private String query = "";
+	private boolean dirty;
+	private long lastSave;
+	private boolean publishPending;
+	private StorageIndex analysedIndex;
+	private List<ReadinessResult> trips = Collections.emptyList();
+	private List<SemanticCoverageResult> gaps = Collections.emptyList();
 
 	@Provides
 	SemanticBankSearchConfig provideConfig(ConfigManager configManager)
@@ -139,1043 +128,563 @@ public class SemanticBankSearchPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
-		LegacyStorageCleanup.remove(configManager::unsetConfiguration);
-		AccountStorageRepository repository = new AccountStorageRepository(
-			RuneLite.RUNELITE_DIR.toPath(),
-			gson,
-			Clock.systemUTC());
-		StorageRetentionPolicy retentionPolicy = new StorageRetentionPolicy(
-			config.maximumRememberedEntries());
-		sessionController = new AccountSessionController(
-			repository,
-			this::resolveItemName,
-			retentionPolicy);
-		threadBridge = ThreadBridge.runtime(clientThread);
-
 		List<SemanticRule> rules = SemanticLibrary.create();
 		engine = new SemanticSearchEngine(rules);
-		bankFilter = new SemanticBankFilter(engine, this::resolveItemMetadata, this::visibleBankItemIds);
-		coverageAnalyzer = new SemanticCoverageAnalyzer(rules);
-		readinessAnalyzer = new ReadinessAnalyzer(rules, ReadinessPackLibrary.create());
-		storageScanner = new ObservedStorageScanner(
-			client::getItemContainer,
-			this::isWidgetVisible,
-			itemManager::canonicalize,
-			this::resolveItemName);
-		overlay = new SemanticBankSearchOverlay(config);
+		bankFilter = new SemanticBankFilter(engine, this::metadataFor, this::bankItemIds);
+		finder = new Finder(engine, this::metadataFor);
+		readiness = new ReadinessAnalyzer(rules, ReadinessPackLibrary.create());
+		coverage = new SemanticCoverageAnalyzer(rules);
+		overlay = new SemanticBankSearchOverlay(config, itemManager);
 		overlayManager.add(overlay);
-		panel = createPanel();
-		navigationButton = NavigationButton.builder()
+
+		panel = new SemanticBankSearchPanel(new SemanticBankSearchPanel.Controller()
+		{
+			@Override
+			public void search(String text)
+			{
+				clientThread.invokeLater(() ->
+				{
+					query = text;
+					publish();
+				});
+			}
+
+			@Override
+			public void refresh()
+			{
+				clientThread.invokeLater(SemanticBankSearchPlugin.this::publish);
+			}
+
+			@Override
+			public void showInBank(String text)
+			{
+				clientThread.invokeLater(() -> showInBankSearch(text));
+			}
+
+			@Override
+			public void forget()
+			{
+				int choice = JOptionPane.showConfirmDialog(panel,
+					"Forget everything Semantic Bank Search remembers about this account?\nIt will relearn when you open your bank.",
+					"Forget this account", JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
+				if (choice == JOptionPane.OK_OPTION)
+				{
+					clientThread.invokeLater(SemanticBankSearchPlugin.this::forgetAccount);
+				}
+			}
+		}, (itemId, onLoaded) ->
+		{
+			AsyncBufferedImage image = itemManager.getImage(itemId);
+			image.onLoaded(onLoaded);
+			return image;
+		});
+
+		navButton = NavigationButton.builder()
 			.tooltip("Semantic Bank Search")
-			.icon(createIcon())
+			.icon(Sigil.icon(16))
 			.priority(7)
 			.panel(panel)
 			.build();
-		clientToolbar.addNavigation(navigationButton);
+		clientToolbar.addNavigation(navButton);
 
-		bankOpen = isBankOpen();
-		handleAccountHashChanged(client.getAccountHash());
+		LegacyStorageCleanup.remove(configManager::unsetConfiguration);
+		clientThread.invokeLater(() ->
+		{
+			if (client.getGameState() == GameState.LOGGED_IN)
+			{
+				loadProfile();
+				readOpenContainers();
+			}
+			publish();
+		});
 	}
 
 	@Override
 	protected void shutDown()
 	{
-		beginAccountTransition();
-		markAllStorageSourcesNotVisible();
-		if (sessionController != null)
-		{
-			sessionController.deactivate();
-		}
-		if (overlay != null)
-		{
-			overlayManager.remove(overlay);
-		}
-		if (navigationButton != null)
-		{
-			clientToolbar.removeNavigation(navigationButton);
-		}
-
-		setViewState(PanelMode.SEARCH, "");
-		panel = null;
-		threadBridge = null;
-		sessionController = null;
+		clientThread.invokeLater(this::save);
+		overlayManager.remove(overlay);
+		clientToolbar.removeNavigation(navButton);
 		overlay = null;
-		engine = null;
-		bankFilter = null;
-		coverageAnalyzer = null;
-		readinessAnalyzer = null;
-		storageScanner = null;
-		visibleStorageSourceKeys.clear();
-		navigationButton = null;
-		index = null;
-		bankOpen = false;
-		lastPersistMillis = 0L;
-		persistenceRetryPending = false;
-		pendingStatusNotice = "";
-	}
-
-	@Subscribe
-	public void onAccountHashChanged(AccountHashChanged event)
-	{
-		handleAccountHashChanged(client.getAccountHash());
+		panel = null;
+		navButton = null;
 	}
 
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
-		if (event != null)
+		if (event.getGameState() == GameState.LOGIN_SCREEN || event.getGameState() == GameState.HOPPING)
 		{
-			handleGameStateChanged(event.getGameState(), client.getAccountHash());
+			save();
+			openPlaces.clear();
 		}
+		if (event.getGameState() == GameState.LOGIN_SCREEN)
+		{
+			vault = null;
+			profile = null;
+			index = new StorageIndex();
+			metadata.clear();
+			overlay.setHighlightedItemIds(Collections.emptyList());
+			publish();
+		}
+	}
+
+	@Subscribe
+	public void onRuneScapeProfileChanged(RuneScapeProfileChanged event)
+	{
+		save();
+		loadProfile();
+		readOpenContainers();
+		publish();
 	}
 
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (event == null
-			|| !SemanticBankSearchConfig.GROUP.equals(event.getGroup())
-			|| !MAXIMUM_REMEMBERED_ENTRIES_KEY.equals(event.getKey()))
+		if (SemanticBankSearchConfig.GROUP.equals(event.getGroup()) && !VAULT_KEY.equals(event.getKey()))
 		{
-			return;
+			clientThread.invokeLater(this::publish);
 		}
-
-		ThreadBridge bridge = threadBridge;
-		if (bridge == null)
-		{
-			return;
-		}
-
-		long capturedEpoch = accountSessionEpoch.get();
-		bridge.submitClient(() -> {
-			if (capturedEpoch != accountSessionEpoch.get())
-			{
-				return;
-			}
-			applyRetentionConfigChange();
-		});
 	}
 
-	private void applyRetentionConfigChange()
+	@Subscribe
+	public void onItemContainerChanged(ItemContainerChanged event)
 	{
-		if (config == null || sessionController == null)
+		String place = placeOf(event.getContainerId());
+		if (place == null || vault == null)
 		{
 			return;
 		}
-
-		boolean trimmed = sessionController.updateRetentionPolicy(
-			config.maximumRememberedEntries());
-		if (!trimmed)
+		openPlaces.add(place);
+		if (record(place, event.getItemContainer()))
 		{
-			return;
+			rebuildIndex();
+			publishPending = true;
 		}
-
-		refreshActivePanelMode();
-		persist(System.currentTimeMillis());
+		saveIfDue();
 	}
 
-	void handleAccountHashChanged(long accountHash)
-	{
-		if (sessionController == null)
-		{
-			return;
-		}
-
-		AccountKey requestedAccount = AccountKey.fromAccountHash(accountHash).orElse(null);
-		if (requestedAccount == null)
-		{
-			deactivateAccount();
-			return;
-		}
-		if (requestedAccount.equals(sessionController.activeAccountKeyOrNull()))
-		{
-			index = sessionController.activeIndexOrNull();
-			return;
-		}
-
-		beginAccountTransition();
-		markAllStorageSourcesNotVisible();
-		publishAccountTransitionClear();
-		lastPersistMillis = 0L;
-
-		AccountSessionUpdate update = sessionController.switchTo(accountHash);
-		index = update.getActiveIndex();
-		if (index != null)
-		{
-			startObservedStorageLifecycle(System.currentTimeMillis());
-		}
-		long finalRevision = setViewState(PanelMode.SEARCH, "");
-		String finalStatus = lastPersistenceFailureNotice.isEmpty()
-			? latestNotice(update, "")
-			: lastPersistenceFailureNotice;
-		publishPanelSnapshot(PanelViewSnapshot.clear(finalRevision, finalStatus));
-	}
-
-	void handleGameStateChanged(GameState gameState, long accountHash)
-	{
-		if (gameState == GameState.LOGGED_IN)
-		{
-			handleAccountHashChanged(accountHash);
-		}
-		else if (gameState == GameState.LOGIN_SCREEN
-			|| gameState == GameState.LOGIN_SCREEN_AUTHENTICATOR)
-		{
-			deactivateAccount();
-		}
-	}
-
-	private void deactivateAccount()
-	{
-		beginAccountTransition();
-		markAllStorageSourcesNotVisible();
-		publishAccountTransitionClear();
-		AccountSessionUpdate update = sessionController == null
-			? null
-			: sessionController.deactivate();
-		index = null;
-		visibleStorageSourceKeys.clear();
-		lastPersistMillis = 0L;
-		long finalRevision = setViewState(PanelMode.SEARCH, "");
-		publishPanelSnapshot(PanelViewSnapshot.clear(
-			finalRevision,
-			latestNotice(update, LOGGED_OUT_STATUS)));
-	}
-
-	private static String latestNotice(AccountSessionUpdate update, String fallback)
-	{
-		if (update == null || update.getNotices().isEmpty())
-		{
-			return fallback;
-		}
-		List<String> notices = update.getNotices();
-		return notices.get(notices.size() - 1);
-	}
-
+	/** Container changes come in bursts; the panel is brought up to date at most once a tick. */
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
-		if (index == null)
+		if (publishPending)
 		{
-			return;
+			publish();
 		}
-
-		long now = System.currentTimeMillis();
-		bankOpen = isBankOpen();
-		handleObservedStorageTick(now);
 	}
 
 	@Subscribe
+	public void onWidgetLoaded(WidgetLoaded event)
+	{
+		if (event.getGroupId() == InterfaceID.BANKMAIN)
+		{
+			openPlaces.add(Vault.BANK);
+			clientThread.invokeLater(() ->
+			{
+				rebuildIndex();
+				publish();
+			});
+		}
+	}
+
+	@Subscribe
+	public void onWidgetClosed(WidgetClosed event)
+	{
+		String place = event.getGroupId() == InterfaceID.BANKMAIN ? Vault.BANK
+			: event.getGroupId() == InterfaceID.SEED_VAULT ? Vault.SEED_VAULT
+			: event.getGroupId() == InterfaceID.SHARED_BANK ? Vault.GROUP_STORAGE
+			: null;
+		if (place != null && openPlaces.remove(place))
+		{
+			save();
+			rebuildIndex();
+			publish();
+		}
+	}
+
+	/**
+	 * The bank's own search runs this callback for every item. A purpose match turns an item on;
+	 * nothing here ever turns one off, so a name search the game would answer stays untouched.
+	 */
+	@Subscribe
 	public void onScriptCallbackEvent(ScriptCallbackEvent event)
 	{
-		if (event == null || !"bankSearchFilter".equals(event.getEventName()) || bankFilter == null)
-		{
-			return;
-		}
-
-		int intStackSize = client.getIntStackSize();
-		int objectStackSize = client.getObjectStackSize();
-		if (intStackSize < 2 || objectStackSize < 1)
+		if (!"bankSearchFilter".equals(event.getEventName()) || !config.bankSearch() || bankFilter == null)
 		{
 			return;
 		}
 
 		int[] intStack = client.getIntStack();
+		int intStackSize = client.getIntStackSize();
 		Object[] objectStack = client.getObjectStack();
-		Object inputValue = objectStack[objectStackSize - 1];
-		if (!(inputValue instanceof String))
+		int objectStackSize = client.getObjectStackSize();
+		if (intStackSize < 2 || objectStackSize < 1 || !(objectStack[objectStackSize - 1] instanceof String))
 		{
 			return;
 		}
 
+		String search = (String) objectStack[objectStackSize - 1];
 		int itemId = intStack[intStackSize - 1];
-		Boolean decision = bankFilter.decision((String) inputValue, itemId);
-		if (decision != null)
+		Boolean decision = bankFilter.decision(search, itemId);
+		if (decision == null)
 		{
-			intStack[intStackSize - 2] = decision ? 1 : 0;
+			return;
+		}
+		if (decision)
+		{
+			intStack[intStackSize - 2] = 1;
+		}
+		else if (search.trim().toLowerCase().startsWith(SemanticBankFilter.FORCE_PREFIX))
+		{
+			// "sem " asks for purpose matches alone.
+			intStack[intStackSize - 2] = 0;
 		}
 	}
 
-	SemanticBankSearchPanel createPanel()
-	{
-		return new SemanticBankSearchPanel(
-			query -> submitClientCommand(() -> runSearch(query)),
-			() -> submitClientCommand(this::showIndexedItems),
-			query -> submitClientCommand(() -> runReadiness(query)),
-			() -> submitClientCommand(this::showCoverageAudit),
-			() -> submitClientCommand(this::clearSearch));
-	}
+	// Account
 
-	private void submitClientCommand(Runnable command)
+	private void loadProfile()
 	{
-		ThreadBridge bridge = threadBridge;
-		long submittedEpoch = accountSessionEpoch.get();
-		if (bridge != null)
+		profile = configManager.getRSProfileKey();
+		vault = null;
+		index = new StorageIndex();
+		metadata.clear();
+		if (profile == null)
 		{
-			bridge.submitClient(() -> {
-				if (accountSessionEpoch.get() == submittedEpoch)
+			return;
+		}
+		if (config.rememberObservedStorage())
+		{
+			String saved = configManager.getRSProfileConfiguration(SemanticBankSearchConfig.GROUP, VAULT_KEY);
+			if (saved != null && !saved.isEmpty())
+			{
+				try
 				{
-					command.run();
+					Vault read = gson.fromJson(saved, Vault.class);
+					vault = read == null ? null : read.repair();
 				}
-			});
-		}
-	}
-
-	private void runSearch(String query)
-	{
-		String cleanedQuery = clean(query);
-		if (cleanedQuery.isEmpty())
-		{
-			clearSearch();
-			return;
-		}
-
-		long revision = setViewState(PanelMode.SEARCH, cleanedQuery);
-		refreshCurrentSearch(cleanedQuery, revision);
-	}
-
-	private void runReadiness(String query)
-	{
-		String cleanedQuery = clean(query);
-		long revision = setViewState(PanelMode.READINESS, cleanedQuery);
-		if (cleanedQuery.isEmpty())
-		{
-			refreshReadiness(cleanedQuery, revision);
-			return;
-		}
-
-		refreshReadiness(cleanedQuery, revision);
-	}
-	private void clearSearch()
-	{
-		long revision = setViewState(PanelMode.SEARCH, "");
-		clearOverlayHighlights();
-		String status = nextSnapshotStatus(hasActiveAccount() ? "" : LOGGED_OUT_STATUS);
-		publishPanelSnapshot(PanelViewSnapshot.clear(revision, status));
-	}
-
-	private boolean hasActiveAccount()
-	{
-		return index != null
-			&& sessionController != null
-			&& sessionController.activeAccountKeyOrNull() != null;
-	}
-
-	private void showIndexedItems()
-	{
-		long revision = setViewState(PanelMode.ALL_INDEXED, "");
-		clearOverlayHighlights();
-		refreshIndexedItems(revision);
-	}
-
-	private void showCoverageAudit()
-	{
-		long revision = setViewState(PanelMode.COVERAGE_AUDIT, "");
-		clearOverlayHighlights();
-		refreshCoverageAudit(revision);
-	}
-
-	private void refreshActivePanelMode()
-	{
-		ViewState viewState = snapshotViewState();
-		if (viewState.panelMode == PanelMode.ALL_INDEXED)
-		{
-			refreshIndexedItems(viewState.revision);
-			return;
-		}
-		if (viewState.panelMode == PanelMode.COVERAGE_AUDIT)
-		{
-			refreshCoverageAudit(viewState.revision);
-			return;
-		}
-		if (viewState.panelMode == PanelMode.READINESS)
-		{
-			refreshReadiness(viewState.query, viewState.revision);
-			return;
-		}
-
-		refreshCurrentSearch(viewState.query, viewState.revision);
-	}
-
-	private void refreshIndexedItems(long revision)
-	{
-		if (panel == null || index == null)
-		{
-			return;
-		}
-
-		List<ObservedItem> items = index.items();
-		items.sort(Comparator
-			.comparing((ObservedItem item) -> !isVisibleBankItem(item))
-			.thenComparing(ObservedItem::getName, String.CASE_INSENSITIVE_ORDER)
-			.thenComparing(ObservedItem::getSourceName, String.CASE_INSENSITIVE_ORDER));
-		PanelViewSnapshot snapshot = PanelViewSnapshot.allIndexed(
-			revision,
-			items,
-			nextSnapshotStatus(indexedStatus(items)));
-		if (isCurrentViewRevision(revision))
-		{
-			publishPanelSnapshot(snapshot);
-		}
-	}
-
-	private void refreshCoverageAudit(long revision)
-	{
-		if (panel == null || coverageAnalyzer == null || index == null)
-		{
-			return;
-		}
-
-		List<SemanticCoverageResult> results = coverageAnalyzer.analyze(index.items());
-		PanelViewSnapshot snapshot = PanelViewSnapshot.coverageAudit(
-			revision,
-			results,
-			nextSnapshotStatus(coverageStatus(results)));
-		if (isCurrentViewRevision(revision))
-		{
-			publishPanelSnapshot(snapshot);
-		}
-	}
-
-	private void refreshReadiness(String query, long revision)
-	{
-		if (panel == null || overlay == null || readinessAnalyzer == null || index == null)
-		{
-			return;
-		}
-
-		ReadinessResult result = readinessAnalyzer.analyze(query, index);
-		List<Integer> highlightedItemIds = readinessHighlightedItemIds(result);
-		PanelViewSnapshot snapshot = PanelViewSnapshot.readiness(
-			revision,
-			query,
-			result,
-			nextSnapshotStatus(readinessStatus(result)));
-		if (isCurrentViewRevision(revision))
-		{
-			overlay.setHighlightedItemIds(highlightedItemIds);
-			publishPanelSnapshot(snapshot);
-		}
-	}
-
-	private void refreshCurrentSearch(String query, long revision)
-	{
-		if (panel == null || overlay == null || engine == null || index == null || query.isEmpty())
-		{
-			return;
-		}
-
-		List<SemanticSearchResult> results = rankingClassifier.recognizes(query)
-			? relativeRankingResults(query)
-			: engine.search(query, index);
-		List<Integer> highlightedItemIds = new ArrayList<>();
-		for (SemanticSearchResult result : results)
-		{
-			if (result.isHighlightable())
-			{
-				highlightedItemIds.add(result.getItemId());
+				catch (JsonParseException e)
+				{
+					log.warn("Semantic Bank Search could not read its saved vault; starting fresh", e);
+				}
 			}
 		}
-		PanelViewSnapshot snapshot = PanelViewSnapshot.search(
-			revision,
-			query,
-			results,
-			nextSnapshotStatus(statusText(results)));
-		if (isCurrentViewRevision(revision))
+		if (vault == null)
 		{
-			overlay.setHighlightedItemIds(highlightedItemIds);
-			publishPanelSnapshot(snapshot);
+			vault = new Vault();
 		}
+		lastSave = System.currentTimeMillis();
+		rebuildIndex();
 	}
 
-	private void clearOverlayHighlights()
+	private void readOpenContainers()
 	{
-		if (overlay != null)
-		{
-			overlay.setHighlightedItemIds(new ArrayList<>());
-		}
-	}
-
-	private void publishPanelSnapshot(PanelViewSnapshot snapshot)
-	{
-		ThreadBridge bridge = threadBridge;
-		SemanticBankSearchPanel targetPanel = panel;
-		long publishedEpoch = accountSessionEpoch.get();
-		if (bridge == null || targetPanel == null || snapshot == null)
+		if (vault == null)
 		{
 			return;
 		}
-		bridge.submitSwing(() -> {
-			if (accountSessionEpoch.get() == publishedEpoch)
+		boolean changed = false;
+		for (int id : new int[]{InventoryID.INV, InventoryID.WORN, InventoryID.BANK, InventoryID.SEED_VAULT, InventoryID.INV_GROUP_TEMP})
+		{
+			ItemContainer container = client.getItemContainer(id);
+			String place = placeOf(id);
+			if (container != null && place != null)
 			{
-				targetPanel.applySnapshot(snapshot);
+				if (id == InventoryID.BANK && !isBankOpen())
+				{
+					continue;
+				}
+				changed |= record(place, container);
 			}
+		}
+		if (isBankOpen())
+		{
+			openPlaces.add(Vault.BANK);
+		}
+		if (changed)
+		{
+			rebuildIndex();
+		}
+	}
+
+	private void forgetAccount()
+	{
+		if (profile != null)
+		{
+			configManager.unsetRSProfileConfiguration(SemanticBankSearchConfig.GROUP, VAULT_KEY);
+		}
+		vault = new Vault();
+		dirty = false;
+		readOpenContainers();
+		rebuildIndex();
+		publish();
+	}
+
+	private void saveIfDue()
+	{
+		if (dirty && System.currentTimeMillis() - lastSave >= SAVE_EVERY_MS)
+		{
+			save();
+		}
+	}
+
+	private void save()
+	{
+		if (!dirty || vault == null || profile == null)
+		{
+			return;
+		}
+		dirty = false;
+		lastSave = System.currentTimeMillis();
+		if (config.rememberObservedStorage())
+		{
+			configManager.setConfiguration(SemanticBankSearchConfig.GROUP, profile, VAULT_KEY, gson.toJson(vault));
+		}
+	}
+
+	// Reading the game
+
+	private static String placeOf(int containerId)
+	{
+		switch (containerId)
+		{
+			case InventoryID.BANK:
+				return Vault.BANK;
+			case InventoryID.INV:
+				return Vault.INVENTORY;
+			case InventoryID.WORN:
+				return Vault.WORN;
+			case InventoryID.SEED_VAULT:
+				return Vault.SEED_VAULT;
+			case InventoryID.INV_GROUP_TEMP:
+				return Vault.GROUP_STORAGE;
+			default:
+				return null;
+		}
+	}
+
+	private boolean record(String place, ItemContainer container)
+	{
+		Map<Integer, Integer> items = new LinkedHashMap<>();
+		for (Item item : container.getItems())
+		{
+			if (item == null || item.getId() <= 0 || item.getQuantity() <= 0)
+			{
+				continue;
+			}
+			int id = itemManager.canonicalize(item.getId());
+			if (id > 0)
+			{
+				items.merge(id, item.getQuantity(), (a, b) -> (int) Math.min(Integer.MAX_VALUE, (long) a + b));
+			}
+		}
+		boolean changed = vault.replace(place, items, System.currentTimeMillis());
+		dirty |= changed;
+		return changed;
+	}
+
+	private void rebuildIndex()
+	{
+		index = vault == null ? new StorageIndex() : vault.toIndex(this::nameOf, openPlaces);
+	}
+
+	private String nameOf(int itemId)
+	{
+		return names.computeIfAbsent(itemId, id ->
+		{
+			ItemComposition composition = itemManager.getItemComposition(id);
+			String name = composition == null ? "" : composition.getName();
+			return name == null || "null".equalsIgnoreCase(name) ? "" : name.trim();
 		});
 	}
 
-	private void beginAccountTransition()
+	private BankItemMetadata metadataFor(int itemId)
 	{
-		accountSessionEpoch.incrementAndGet();
-		lastPersistAttemptMillis = 0L;
-		persistenceRetryPending = false;
-		pendingStatusNotice = "";
-		lastPersistenceFailureNotice = "";
-	}
-
-	private void publishAccountTransitionClear()
-	{
-		long transitionRevision = setViewState(PanelMode.SEARCH, "");
-		clearOverlayHighlights();
-		publishPanelSnapshot(PanelViewSnapshot.clear(transitionRevision));
-	}
-
-	private String nextSnapshotStatus(String fallback)
-	{
-		if (pendingStatusNotice.isEmpty())
+		BankItemMetadata cached = metadata.get(itemId);
+		if (cached != null || metadata.containsKey(itemId))
 		{
-			return fallback;
+			return cached;
 		}
-
-		String notice = pendingStatusNotice;
-		pendingStatusNotice = "";
-		return notice;
+		BankItemMetadata read = readMetadata(itemId);
+		metadata.put(itemId, read);
+		return read;
 	}
 
-	private List<SemanticSearchResult> relativeRankingResults(String query)
+	private BankItemMetadata readMetadata(int itemId)
 	{
-		List<ObservedItem> observedItems = index.items();
-		Map<Integer, BankItemMetadata> metadataById = new HashMap<>();
-		List<BankItemMetadata> ownedMetadata = new ArrayList<>();
-		for (ObservedItem item : observedItems)
-		{
-			if (!metadataById.containsKey(item.getItemId()))
-			{
-				BankItemMetadata metadata = resolveItemMetadata(item.getItemId());
-				metadataById.put(item.getItemId(), metadata);
-				if (metadata != null)
-				{
-					ownedMetadata.add(metadata);
-				}
-			}
-		}
-
-		List<SemanticSearchResult> results = new ArrayList<>();
-		for (ObservedItem item : observedItems)
-		{
-			BankItemMetadata metadata = metadataById.get(item.getItemId());
-			if (rankingClassifier.matches(query, metadata, ownedMetadata))
-			{
-				results.add(new SemanticSearchResult(
-					item.getItemId(),
-					item.getName(),
-					item.getQuantity(),
-					item.getSourceType(),
-					item.getSourceName(),
-					item.isCurrentlyVisible(),
-					"Owned ranking",
-					rankingClassifier.explanation(query, metadata),
-					rankingClassifier.score(query, metadata)));
-			}
-		}
-		results.sort(Comparator
-			.comparingInt(SemanticSearchResult::getScore).reversed()
-			.thenComparing(SemanticSearchResult::getItemName, String.CASE_INSENSITIVE_ORDER));
-		return results;
-	}
-	private static List<Integer> readinessHighlightedItemIds(ReadinessResult result)
-	{
-		List<Integer> highlightedItemIds = new ArrayList<>();
-		if (result == null || !result.isMatched())
-		{
-			return highlightedItemIds;
-		}
-		for (ReadinessSlotResult slotResult : result.getSlotResults())
-		{
-			for (SemanticSearchResult item : slotResult.getOwnedItems())
-			{
-				if (item.isHighlightable() && !highlightedItemIds.contains(item.getItemId()))
-				{
-					highlightedItemIds.add(item.getItemId());
-				}
-			}
-		}
-		return highlightedItemIds;
-	}
-
-	private long setViewState(PanelMode panelMode, String query)
-	{
-		this.panelMode = panelMode;
-		currentQuery = query == null ? "" : query;
-		return ++viewRevision;
-	}
-
-	private ViewState snapshotViewState()
-	{
-		return new ViewState(panelMode, currentQuery, viewRevision);
-	}
-
-	private boolean isCurrentViewRevision(long revision)
-	{
-		return revision == viewRevision;
-	}
-	void startObservedStorageLifecycle(long now)
-	{
-		boolean clearedVisibleStorage = markAllStorageSourcesNotVisible();
-		boolean observingStorage = config != null && config.rememberObservedStorage();
-		if (observingStorage)
-		{
-			observeSafeStorage(now);
-		}
-		boolean trimmedStorage = trimActiveIndex();
-		if (trimmedStorage || (!observingStorage && clearedVisibleStorage))
-		{
-			persist(now);
-		}
-	}
-
-	boolean handleObservedStorageTick(long now)
-	{
-		if (index == null || config == null)
-		{
-			return false;
-		}
-
-		if (config.rememberObservedStorage())
-		{
-			Set<String> previouslyVisibleSourceKeys = new HashSet<>(visibleStorageSourceKeys);
-			boolean changed = observeSafeStorage(now);
-			boolean trimmedStorage = trimActiveIndex();
-			boolean visibilityLost = !visibleStorageSourceKeys.containsAll(previouslyVisibleSourceKeys);
-			boolean scheduledPersistence = persistenceRetryPending
-				? persistenceRetryDue(now)
-				: lastPersistMillis == 0L || now - lastPersistMillis >= SAVE_INTERVAL_MILLIS;
-			boolean shouldPersist = trimmedStorage || visibilityLost || scheduledPersistence;
-			if (changed || trimmedStorage)
-			{
-				refreshActivePanelMode();
-			}
-			if (shouldPersist)
-			{
-				persist(now);
-			}
-			return shouldPersist;
-		}
-
-		boolean hadVisibleStorage = !visibleStorageSourceKeys.isEmpty();
-		if (hadVisibleStorage)
-		{
-			markAllStorageSourcesNotVisible();
-		}
-		boolean trimmedStorage = trimActiveIndex();
-		boolean scheduledRetry = persistenceRetryPending && persistenceRetryDue(now);
-		if (scheduledRetry || hadVisibleStorage || trimmedStorage)
-		{
-			refreshActivePanelMode();
-			persist(now);
-			return true;
-		}
-		return false;
-	}
-
-	private boolean persistenceRetryDue(long now)
-	{
-		return now - lastPersistAttemptMillis >= SAVE_INTERVAL_MILLIS;
-	}
-
-	void setObservedStorageLifecycleStateForTesting(
-		StorageIndex index,
-		ObservedStorageScanner storageScanner,
-		SemanticBankSearchConfig config)
-	{
-		this.index = index;
-		this.storageScanner = storageScanner;
-		this.config = config;
-	}
-
-	void rememberVisibleStorageSourceForTesting(ObservedStorageSource source)
-	{
-		visibleStorageSourceKeys.add(source.key());
-	}
-
-	void setLastPersistMillisForTesting(long lastPersistMillis)
-	{
-		this.lastPersistMillis = lastPersistMillis;
-	}
-
-	void setSearchComponentsForTesting(
-		StorageIndex index,
-		SemanticCoverageAnalyzer coverageAnalyzer,
-		SemanticBankSearchPanel panel,
-		SemanticBankSearchOverlay overlay)
-	{
-		setSearchComponentsForTesting(index, coverageAnalyzer, null, panel, overlay);
-	}
-
-	void setSearchComponentsForTesting(
-		StorageIndex index,
-		SemanticCoverageAnalyzer coverageAnalyzer,
-		ReadinessAnalyzer readinessAnalyzer,
-		SemanticBankSearchPanel panel,
-		SemanticBankSearchOverlay overlay)
-	{
-		this.index = index;
-		this.coverageAnalyzer = coverageAnalyzer;
-		this.readinessAnalyzer = readinessAnalyzer;
-		this.panel = panel;
-		this.overlay = overlay;
-	}
-
-	void setRuntimeDependenciesForTesting(
-		AccountSessionController sessionController,
-		ThreadBridge threadBridge)
-	{
-		this.sessionController = sessionController;
-		this.threadBridge = threadBridge;
-	}
-
-	void showCoverageAuditForTesting()
-	{
-		showCoverageAudit();
-	}
-
-	void showReadinessForTesting(String query)
-	{
-		runReadiness(query);
-	}
-
-	String coverageStatusForTesting(List<SemanticCoverageResult> results)
-	{
-		return coverageStatus(results);
-	}
-
-	private boolean observeSafeStorage(long now)
-	{
-		if (index == null || storageScanner == null || !config.rememberObservedStorage())
-		{
-			return false;
-		}
-
-		List<ObservedStorageSnapshot> snapshots = storageScanner.scan(
-			ObservedStorageSource.safeDirectInventorySources(),
-			now);
-		Set<String> currentlyVisibleSourceKeys = new HashSet<>();
-		boolean changed = false;
-		for (ObservedStorageSnapshot snapshot : snapshots)
-		{
-			ObservedStorageSource source = snapshot.getSource();
-			currentlyVisibleSourceKeys.add(source.key());
-			changed |= SafeStorageObservation.replaceVisibleSourceItemsIfChanged(
-				index,
-				source,
-				snapshot.getItems());
-		}
-
-		for (String previousKey : new HashSet<>(visibleStorageSourceKeys))
-		{
-			if (!currentlyVisibleSourceKeys.contains(previousKey))
-			{
-				markSourceKeyNotVisible(previousKey);
-				changed = true;
-			}
-		}
-		if (!currentlyVisibleSourceKeys.equals(visibleStorageSourceKeys))
-		{
-			changed = true;
-		}
-		visibleStorageSourceKeys.clear();
-		visibleStorageSourceKeys.addAll(currentlyVisibleSourceKeys);
-		return changed;
-	}
-
-	private boolean trimActiveIndex()
-	{
-		return index != null
-			&& sessionController != null
-			&& sessionController.trimActiveIndex();
-	}
-
-	private boolean markAllStorageSourcesNotVisible()
-	{
-		if (index == null)
-		{
-			return false;
-		}
-
-		boolean changed = SafeStorageObservation.markAllSafeStorageSourcesNotVisible(index);
-		visibleStorageSourceKeys.clear();
-		return changed;
-	}
-
-	private void markSourceKeyNotVisible(String sourceKey)
-	{
-		for (ObservedStorageSource source : ObservedStorageSource.safeDirectInventorySources())
-		{
-			if (source.key().equals(sourceKey))
-			{
-				index.markSourceNotVisible(source.getSourceType(), source.getSourceName());
-				return;
-			}
-		}
-	}
-
-	private String resolveItemName(int itemId)
-	{
-		if (itemId <= 0)
-		{
-			return "";
-		}
-
-		try
-		{
-			ItemComposition itemComposition = itemManager.getItemComposition(itemId);
-			if (itemComposition == null)
-			{
-				return "";
-			}
-
-			String name = clean(itemComposition.getName());
-			return name.equalsIgnoreCase("null") ? "" : name;
-		}
-		catch (RuntimeException ignored)
-		{
-			return "";
-		}
-	}
-
-	private BankItemMetadata resolveItemMetadata(int itemId)
-	{
-		ItemComposition itemComposition = itemManager.getItemComposition(itemId);
-		if (itemComposition == null)
+		ItemComposition composition = itemManager.getItemComposition(itemId);
+		if (composition == null)
 		{
 			return null;
 		}
-
-		String[] actions = itemComposition.getInventoryActions();
 		boolean wieldable = false;
-		boolean actionEquipable = false;
+		boolean wearable = false;
 		boolean edible = false;
 		boolean drinkable = false;
+		String[] actions = composition.getInventoryActions();
 		if (actions != null)
 		{
 			for (String action : actions)
 			{
-				if ("Wield".equalsIgnoreCase(action))
-				{
-					wieldable = true;
-				}
-				actionEquipable |= "Wield".equalsIgnoreCase(action) || "Wear".equalsIgnoreCase(action);
+				wieldable |= "Wield".equalsIgnoreCase(action);
+				wearable |= "Wield".equalsIgnoreCase(action) || "Wear".equalsIgnoreCase(action);
 				edible |= "Eat".equalsIgnoreCase(action);
 				drinkable |= "Drink".equalsIgnoreCase(action);
 			}
 		}
-
 		ItemStats stats = itemManager.getItemStats(itemId);
-		ItemEquipmentStats equipment = stats == null ? null : stats.getEquipment();
+		ItemEquipmentStats eq = stats == null ? null : stats.getEquipment();
 		return new BankItemMetadata(
-			resolveItemName(itemId),
-			actionEquipable || stats != null && stats.isEquipable(),
+			nameOf(itemId),
+			wearable || stats != null && stats.isEquipable(),
 			wieldable,
 			edible,
 			drinkable,
-			equipment == null ? -1 : equipment.getSlot(),
-			equipment == null ? 0 : equipment.getAstab(),
-			equipment == null ? 0 : equipment.getAslash(),
-			equipment == null ? 0 : equipment.getAcrush(),
-			equipment == null ? 0 : equipment.getAmagic(),
-			equipment == null ? 0 : equipment.getArange(),
-			equipment == null ? 0 : equipment.getStr(),
-			equipment == null ? 0 : equipment.getRstr(),
-			equipment == null ? 0 : equipment.getMdmg(),
-			equipment == null ? 0 : equipment.getPrayer(),
-			resolveHealing(itemId));
+			eq == null ? -1 : eq.getSlot(),
+			eq == null ? 0 : eq.getAstab(),
+			eq == null ? 0 : eq.getAslash(),
+			eq == null ? 0 : eq.getAcrush(),
+			eq == null ? 0 : eq.getAmagic(),
+			eq == null ? 0 : eq.getArange(),
+			eq == null ? 0 : eq.getStr(),
+			eq == null ? 0 : eq.getRstr(),
+			eq == null ? 0 : eq.getMdmg(),
+			eq == null ? 0 : eq.getPrayer(),
+			healing(itemId));
 	}
 
-	private int resolveHealing(int itemId)
+	private int healing(int itemId)
 	{
 		try
 		{
 			Effect effect = itemStatChangesService.getItemStatChanges(itemId);
-			if (effect == null)
+			if (effect != null)
 			{
-				return -1;
-			}
-
-			for (StatChange change : effect.calculate(client).getStatChanges())
-			{
-				if (change != null && change.getStat() == Stats.HITPOINTS)
+				for (StatChange change : effect.calculate(client).getStatChanges())
 				{
-					return Math.max(0, change.getTheoretical());
+					if (change != null && change.getStat() == Stats.HITPOINTS)
+					{
+						return Math.max(0, change.getTheoretical());
+					}
 				}
 			}
 		}
 		catch (RuntimeException ignored)
 		{
-			// Missing or level-dependent data should not satisfy numerical queries.
+			// Level-dependent or missing data never satisfies a healing search.
 		}
 		return -1;
 	}
 
-
-	private List<Integer> visibleBankItemIds()
+	private List<Integer> bankItemIds()
 	{
 		ItemContainer bank = client.getItemContainer(InventoryID.BANK);
-		if (bank == null)
+		List<Integer> ids = new ArrayList<>();
+		if (bank != null)
 		{
-			return new ArrayList<>();
-		}
-
-		List<Integer> itemIds = new ArrayList<>();
-		Set<Integer> seen = new HashSet<>();
-		for (Item item : bank.getItems())
-		{
-			if (item != null && item.getId() > 0 && seen.add(item.getId()))
+			Set<Integer> seen = new HashSet<>();
+			for (Item item : bank.getItems())
 			{
-				itemIds.add(item.getId());
+				if (item != null && item.getId() > 0 && seen.add(item.getId()))
+				{
+					ids.add(item.getId());
+				}
 			}
 		}
-		return itemIds;
-	}
-
-	private void persist(long persistedAtMillis)
-	{
-		if (!hasActiveAccount())
-		{
-			return;
-		}
-
-		lastPersistAttemptMillis = persistedAtMillis;
-		String failureNotice = sessionController.persist().orElse("");
-		if (!failureNotice.isEmpty())
-		{
-			lastPersistenceFailureNotice = failureNotice;
-			boolean firstFailure = !persistenceRetryPending;
-			persistenceRetryPending = true;
-			if (firstFailure)
-			{
-				publishPersistenceFailureNotice(failureNotice);
-			}
-			return;
-		}
-
-		persistenceRetryPending = false;
-		pendingStatusNotice = "";
-		lastPersistenceFailureNotice = "";
-		lastPersistMillis = persistedAtMillis;
-	}
-
-	private void publishPersistenceFailureNotice(String failureNotice)
-	{
-		pendingStatusNotice = failureNotice;
-		if (panel == null)
-		{
-			return;
-		}
-
-		long noticeRevision = setViewState(panelMode, currentQuery);
-		if (panelMode == PanelMode.SEARCH && currentQuery.isEmpty())
-		{
-			publishPanelSnapshot(PanelViewSnapshot.clear(
-				noticeRevision,
-				nextSnapshotStatus("")));
-			return;
-		}
-		refreshActivePanelMode();
-	}
-
-	private String indexedStatus(List<ObservedItem> items)
-	{
-		if (items == null || items.isEmpty())
-		{
-			return "";
-		}
-		if (!bankOpen)
-		{
-			return "Open the bank to refresh visible item status.";
-		}
-		return "Showing " + items.size() + " observed items.";
-	}
-
-	private String coverageStatus(List<SemanticCoverageResult> results)
-	{
-		if (results == null || results.isEmpty())
-		{
-			return "";
-		}
-
-		int covered = 0;
-		for (SemanticCoverageResult result : results)
-		{
-			if (result.isCovered())
-			{
-				covered++;
-			}
-		}
-		return "Covered " + covered + " of " + results.size() + " observed items.";
-	}
-
-	private String readinessStatus(ReadinessResult result)
-	{
-		if (result == null || !result.isMatched())
-		{
-			return "";
-		}
-		int required = result.getRequiredSlotCount();
-		if (required == 0)
-		{
-			return "Readiness: no required slots in this pack.";
-		}
-		return "Readiness: " + result.getCoveredRequiredSlotCount() + " of " + required + " required slots covered.";
-	}
-	private String statusText(List<SemanticSearchResult> results)
-	{
-		if (results == null || results.isEmpty())
-		{
-			return "";
-		}
-		if (!bankOpen)
-		{
-			return "Open the bank to see visible item highlights.";
-		}
-		if (!config.enableHighlights())
-		{
-			return "Bank highlights are disabled in plugin settings.";
-		}
-		return "";
+		return ids;
 	}
 
 	private boolean isBankOpen()
 	{
-		return isWidgetVisible(ComponentID.BANK_ITEM_CONTAINER);
+		Widget items = client.getWidget(InterfaceID.Bankmain.ITEMS);
+		return items != null && !items.isHidden();
 	}
 
-	private boolean isWidgetVisible(int packedComponentId)
+	/** Puts a purpose search into the bank's own search box, so the bank shows the same answer. */
+	private void showInBankSearch(String text)
 	{
-		Widget widget = client.getWidget(packedComponentId);
-		return widget != null && !widget.isHidden();
+		if (!isBankOpen() || text == null || text.trim().isEmpty())
+		{
+			return;
+		}
+		bankSearch.initSearch();
+		clientThread.invokeLater(() ->
+		{
+			client.setVarcStrValue(VarClientID.MESLAYERINPUT, text.trim());
+			bankSearch.layoutBank();
+		});
 	}
 
-	private static boolean isVisibleBankItem(ObservedItem item)
-	{
-		return item.isCurrentlyVisible() && item.getSourceType() == StorageSourceType.BANK;
-	}
+	// Panel
 
-	private static String clean(String text)
+	private void publish()
 	{
-		return text == null ? "" : text.trim();
-	}
+		publishPending = false;
+		SemanticBankSearchPanel target = panel;
+		if (target == null)
+		{
+			return;
+		}
+		long now = System.currentTimeMillis();
+		if (vault == null || client.getGameState() != GameState.LOGGED_IN && client.getGameState() != GameState.LOADING)
+		{
+			if (overlay != null)
+			{
+				overlay.setHighlightedItemIds(Collections.emptyList());
+			}
+			PanelModel model = PanelModel.loggedOut(now);
+			SwingUtilities.invokeLater(() -> target.update(model));
+			return;
+		}
 
-	private static BufferedImage createIcon()
-	{
-		BufferedImage image = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
-		Graphics2D graphics = image.createGraphics();
-		graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		graphics.setColor(new Color(28, 31, 35));
-		graphics.fillRoundRect(1, 1, 14, 14, 4, 4);
-		graphics.setColor(new Color(0, 190, 255));
-		graphics.drawRoundRect(1, 1, 13, 13, 4, 4);
-		graphics.drawOval(4, 4, 5, 5);
-		graphics.drawLine(8, 8, 12, 12);
-		graphics.setColor(new Color(255, 152, 0));
-		graphics.fillOval(10, 3, 2, 2);
-		graphics.dispose();
-		return image;
+		Finder.Finding finding = finder.find(query, index);
+		List<Integer> lit = new ArrayList<>();
+		for (Finder.Hit hit : finding.hits)
+		{
+			lit.add(hit.itemId);
+		}
+		overlay.setHighlightedItemIds(lit);
+
+		List<PanelModel.PlaceSummary> places = new ArrayList<>();
+		for (String name : Vault.PLACES)
+		{
+			Vault.Place place = vault.place(name);
+			if (place == null || place.seen == 0)
+			{
+				continue;
+			}
+			long qty = 0;
+			for (int q : place.items.values())
+			{
+				qty += q;
+			}
+			places.add(new PanelModel.PlaceSummary(name, place.items.size(), qty, place.seen, openPlaces.contains(name)));
+		}
+		Vault.Place bank = vault.place(Vault.BANK);
+		Player local = client.getLocalPlayer();
+		List<ObservedItem> items = index.items();
+		// Trips and gaps look at the whole vault; they are only worked out again when it has
+		// changed and someone is looking at the panel.
+		if (analysedIndex != index && target.isShowing())
+		{
+			analysedIndex = index;
+			trips = readiness.analyzeAll(index);
+			gaps = coverage.analyze(items);
+		}
+		PanelModel model = new PanelModel(
+			true,
+			local == null ? null : local.getName(),
+			bank != null && bank.seen > 0,
+			isBankOpen(),
+			config.bankSearch(),
+			vault.distinctItems(),
+			places,
+			items,
+			trips,
+			gaps,
+			finding,
+			now);
+		SwingUtilities.invokeLater(() -> target.update(model));
 	}
 }

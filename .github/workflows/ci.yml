@@ -1,4 +1,4 @@
-name: Beta CI
+name: CI
 
 on:
   push:
@@ -67,12 +67,12 @@ jobs:
             git diff --check "$empty_tree" HEAD
           fi
 
-      - name: Enforce account-index privacy
+      - name: Enforce storage privacy
         shell: bash
         run: |
           set -euo pipefail
-          if rg -n '\b(getConfiguration|setConfiguration)\b|semanticbanksearch\.index|\bSTORAGE_KEY\b' src/main/java/com/semanticbanksearch; then
-            echo "Observed bank indexes must not use ConfigManager; legacy unset cleanup remains permitted."
+          if rg -n 'java\.io\.File|java\.nio|RUNELITE_DIR|getAccountHash' src/main/java/com/semanticbanksearch; then
+            echo "What the account owns belongs in RuneLite's per-account profile config, not in files or keyed by account hash."
             exit 1
           fi
 

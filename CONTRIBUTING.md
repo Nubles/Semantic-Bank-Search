@@ -16,7 +16,6 @@ Semantic coverage is protected by repeatable tests and scorecards:
 
 - [Semantic Coverage Guide](docs/SEMANTIC_COVERAGE.md) explains how to add new purpose coverage safely.
 - [Semantic QA Scorecard](docs/SEMANTIC_QA_SCORECARD.md) tracks curated player queries, expected positives, expected negatives, and current pass totals.
-- [Beta Release Checklist](docs/BETA_RELEASE_CHECKLIST.md) covers the manual in-game QA needed before promoting a beta build.
 
 For semantic changes, run:
 
@@ -51,19 +50,13 @@ The short version:
 5. Make the smallest rule change needed to pass the tests.
 6. Use mechanical item-awareness tags only as triage aids; do not treat them as semantic purpose coverage.
 
-## Beta Release QA
+## Release QA
 
-Before publishing or promoting a beta build, complete the automated checks and the manual in-game checklist in [Beta Release Checklist](docs/BETA_RELEASE_CHECKLIST.md).
+Before publishing a build, run the automated checks above, then in game confirm:
 
-Manual QA should use a real account with a messy bank where possible, and should confirm:
-
-- Search, fuzzy search, and visible bank highlights.
-- All indexed item display and remembered storage behavior.
-- Readiness owned/missing groups for common packs.
-- Coverage grouping for uncovered and covered items.
-- Clear behavior resetting panel results and highlights.
-
-If manual QA has not been completed, say that explicitly in the PR or release notes. Do not present the plugin as 1.0 until real-bank QA, screenshots or GIFs, and beta feedback triage are complete.
+- Typing a name into the bank search works exactly as before, letter by letter.
+- A purpose typed into the bank search adds the items that serve it; "sem " shows them alone.
+- The side panel's Search, Trips, Vault and Gaps pages match what the bank holds, and matches light up in gold.
 
 ## Safety Rules
 
@@ -81,10 +74,10 @@ The plugin may list and highlight matching observed items, but it must not act o
 
 Runtime persistence review rules:
 
-- Do not store bank contents in `ConfigManager`.
-- Do not write a raw account hash or account display name to disk.
-- Swing callbacks must not read RuneLite client state directly; use the existing thread bridge and immutable snapshots.
-- Persistence failures must never retain another account's in-memory index.
+- What the account owns is kept in RuneLite's per-account profile config (`setRSProfileConfiguration`), never in files.
+- Never write a raw account hash or account display name anywhere.
+- Swing code must not read client state; the plugin builds a `PanelModel` on the client thread and hands it to Swing whole.
+- The bank search callback may turn items on; only the explicit "sem " prefix may turn items off.
 
 ## Before Opening A PR
 

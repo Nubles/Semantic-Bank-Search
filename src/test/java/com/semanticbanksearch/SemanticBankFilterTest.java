@@ -51,6 +51,22 @@ public class SemanticBankFilterTest
     }
 
     @Test
+    public void halfTypedWordsAreNeverReadAsPurposes()
+    {
+        // Each keystroke runs the bank search; "s" and "sh" on the way to "shark" must not hide it.
+        for (String typing : new String[]{"s", "sh", "sha", "shar", "a", "d", "dr", "r", "ru", "b", "ba", "t", "to"})
+        {
+            assertNull(typing, filter.decision(typing, 101));
+        }
+    }
+
+    @Test
+    public void prayerGearIsAnsweredFromEquipmentStatsAlone()
+    {
+        assertFalse(filter.decision("prayer gear", 100));
+    }
+
+    @Test
     public void ordinaryItemNameSearchIsLeftToRuneLite()
     {
         assertNull(filter.decision("shark", 101));

@@ -66,6 +66,42 @@ public class SemanticSearchEngine
         return false;
     }
 
+    /** The highest scoring rule that reads the query and claims the item, or null. */
+    SemanticRule bestRule(String query, String itemName)
+    {
+        String normalizedItemName = normalize(itemName);
+        SemanticRule best = null;
+        for (SemanticRule rule : matchingRules(normalize(query)))
+        {
+            if (rule.matchesItem(normalizedItemName)
+                && (best == null || rule.scoreFor(normalizedItemName) > best.scoreFor(normalizedItemName)))
+            {
+                best = rule;
+            }
+        }
+        return best;
+    }
+
+    /** The purposes a query was read as, in library order, without repeats. */
+    List<String> categories(String query)
+    {
+        List<String> categories = new ArrayList<>();
+        for (SemanticRule rule : matchingRules(normalize(query)))
+        {
+            if (!categories.contains(rule.getCategory()))
+            {
+                categories.add(rule.getCategory());
+            }
+        }
+        return categories;
+    }
+
+    static boolean nameMatches(String query, String itemName)
+    {
+        String normalizedQuery = normalize(query);
+        return !normalizedQuery.isEmpty() && allQueryTokensMatchItem(normalizedQuery, normalize(itemName));
+    }
+
     private List<SemanticRule> matchingRules(String normalizedQuery)
     {
         List<SemanticRule> matches = new ArrayList<>();

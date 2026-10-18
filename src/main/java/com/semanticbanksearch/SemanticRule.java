@@ -42,7 +42,17 @@ public class SemanticRule
         "skilling",
         "boost",
         "boosts",
-        "runes");
+        "runes",
+        "teleport",
+        "teleports",
+        "tele",
+        "teles",
+        "teleportation");
+
+    private static final int MIN_COMPLETION_LENGTH = 4;
+
+    /** Words that join a category name together and say nothing about a purpose. */
+    private static final Set<String> LINKING_WORDS = Set.of("and", "the", "for", "with", "from");
 
     private final String category;
     private final String reason;
@@ -158,7 +168,7 @@ public class SemanticRule
         List<String> words = new ArrayList<>();
         for (String word : normalizedCategory.split("\\s+"))
         {
-            if (word.length() > 2 && !GENERIC_CATEGORY_WORDS.contains(word))
+            if (word.length() > 2 && !GENERIC_CATEGORY_WORDS.contains(word) && !LINKING_WORDS.contains(word))
             {
                 words.add(word);
             }
@@ -181,9 +191,14 @@ public class SemanticRule
 
     private static boolean containsWord(String normalizedText, String normalizedWord)
     {
-        for (String token : normalizedText.split("\\s+"))
+        String[] tokens = normalizedText.split("\\s+");
+        int minimum = tokens.length > 1 ? MIN_COMPLETION_LENGTH - 1 : MIN_COMPLETION_LENGTH;
+        for (String token : tokens)
         {
-            if (token.equals(normalizedWord) || token.startsWith(normalizedWord) || normalizedWord.startsWith(token))
+            // A half-typed word only completes a purpose once it is long enough to mean something,
+            // so typing "s" or "sh" into the bank never reads as a purpose search.
+            if (token.equals(normalizedWord) || token.startsWith(normalizedWord)
+                || token.length() >= minimum && normalizedWord.startsWith(token))
             {
                 return true;
             }

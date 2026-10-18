@@ -15,7 +15,6 @@ import java.util.Set;
 import javax.inject.Inject;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.Item;
@@ -51,8 +50,9 @@ import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.AsyncBufferedImage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-@Slf4j
 @PluginDescriptor(
 	name = "Semantic Bank Search",
 	description = "Search what you own by what it is for: \"prayer restoration\", \"food over 18 hp\", \"best melee weapon\", in the bank and from anywhere.",
@@ -60,6 +60,8 @@ import net.runelite.client.util.AsyncBufferedImage;
 )
 public class SemanticBankSearchPlugin extends Plugin
 {
+	private static final Logger log = LoggerFactory.getLogger(SemanticBankSearchPlugin.class);
+
 	private static final String VAULT_KEY = "vault";
 	private static final long SAVE_EVERY_MS = 30_000L;
 
